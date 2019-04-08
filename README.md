@@ -5,6 +5,6 @@ The following figure illustrates our priliminary faceswapping results on random 
 
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/result.jpg)
 
-Our model is still very sentitive, e.g., when feeding identities that the model had never seem before or are outside training data distribution (such as asian faces that are scarce in VGGFace2), our GAN could not genereate faces with high fidelity.
+Our model is still very data sentitive, i.e., when feeding identities that the model had never seem before or are outside training data distribution (such as asian faces that are scarce in VGGFace2), our GAN failed at genereating faces with high fidelity.
 
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/result2.jpg)
