@@ -44,17 +44,16 @@ class FaceAlignmentDetector(BaseFaceDetector):
             bbox_list, _ = self.fd.detect_face(image)
         if len(bbox_list) == 0:
             return [], []
-        landmarks_list = []
-        im_shape = image.shape
         if self.fd_type == "mtcnn":
             bbox_list = self.preprocess_mtcnn_bbox(bbox_list)
+        landmarks_list = []
         if with_landmark:
             for bbox in bbox_list:
                 pnts = self.lmd.detect_landmarks(image, bounding_box=bbox)[-1]
                 landmarks_list.append(np.array(pnts))
             landmarks_list = [self.post_process_landmarks(landmarks) for landmarks in landmarks_list]
-            landmarks_list = np.concatenate(landmarks_list, axis=-1)
-        bbox_list = [self.post_process_bbox(bbox, im_shape) for bbox in bbox_list]
+            landmarks_list = np.concatenate(landmarks_list, axis=-1)        
+        bbox_list = [self.post_process_bbox(bbox, image) for bbox in bbox_list]
         bbox_list = [bbox for bbox in bbox_list if self.compute_face_area(bbox) >= kwargs["min_face_area"]]
         return bbox_list, landmarks_list
     
@@ -62,17 +61,18 @@ class FaceAlignmentDetector(BaseFaceDetector):
         raise NotImplementedError
         
     @staticmethod
-    def post_process_bbox(bbox, im_shape):
-        # video converter expect bbox coord. in [x0, y1, x1, y0, score] ordering
-        y0, x0, y1, x1, score = bbox        
+    def post_process_bbox(bbox, image):
+        # Process bbox coord. to have [x0, y1, x1, y0, score] ordering
+        y0, x0, y1, x1, score = bbox       
+        im_shape = image.shape
         w = int(y1 - y0)
         h = int(x1 - x0)
-        length = (w + h)/2
-        center = (int((x1+x0)/2),int((y1+y0)/2))
-        new_x0 = np.max([0, (center[0]-length//2)])#.astype(np.int32)
-        new_x1 = np.min([im_shape[0], (center[0]+length//2)])#.astype(np.int32)
-        new_y0 = np.max([0, (center[1]-length//2)])#.astype(np.int32)
-        new_y1 = np.min([im_shape[1], (center[1]+length//2)])#.astype(np.int32)
+        length = (w + h) / 2
+        center = (int((x1 + x0) / 2),int((y1 + y0) / 2))
+        new_x0 = np.max([0, (center[0] - length // 2)])
+        new_x1 = np.min([im_shape[0], (center[0] + length // 2)])
+        new_y0 = np.max([0, (center[1] - length // 2)])
+        new_y1 = np.min([im_shape[1], (center[1] + length // 2)])
         bbox = np.array([new_x0, new_y1, new_x1, new_y0, score])
         return bbox
     
@@ -92,7 +92,7 @@ class FaceAlignmentDetector(BaseFaceDetector):
         
     @staticmethod
     def post_process_landmarks(landmarks):
-        # video converter expect landmarks having shape [xy, pnts]
+        # Process landmarks to have shape [xy, pnts]
         lms = landmarks.reshape(landmarks.shape[0] * landmarks.shape[1], 1)
         if lms.ndim == 1:
             lms = lms[:, np.newaxis]
