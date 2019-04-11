@@ -46,8 +46,8 @@ class FaceAlignmentDetector(BaseFaceDetector):
             return [], []
         if self.fd_type == "mtcnn":
             bbox_list = self.preprocess_mtcnn_bbox(bbox_list)
-        landmarks_list = []
         if with_landmark:
+            landmarks_list = []
             for bbox in bbox_list:
                 pnts = self.lmd.detect_landmarks(image, bounding_box=bbox)[-1]
                 landmarks_list.append(np.array(pnts))
