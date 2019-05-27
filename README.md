@@ -1,5 +1,5 @@
 # Few-shot face translation
-A GAN based approach for one model to swap them all.
+A GAN based faceswap approach for one model to swap them all.
 
 The following figures illustrate our priliminary faceswapping results on random identities drawn from [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/) dataset. We also show failure cases, which demonstrate limitations of our model for genrerating faces with consistent skin tone, eye-glasses, and expression.
 
