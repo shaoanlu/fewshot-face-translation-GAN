@@ -1,5 +1,5 @@
 # Few-shot face translation
-A GAN based faceswap approach for one model to swap them all.
+A GAN based approach for one model to swap them all.
 
 The following figures illustrate our priliminary faceswapping results on random identities drawn from [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/) dataset. We also show failure cases, which demonstrate limitations of our model for genrerating faces with consistent skin tone, eye-glasses, and expression.
 
@@ -11,11 +11,11 @@ Our model is still very data sentitive, i.e., when feeding identities that the m
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/result2.jpg)
 
 ## Architecture
-![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation.png)
+![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_gen.png)
 
-The above image illustrates our generator, which is a encoder-decoder based network, at test phase. Our swap-them-all approach is basically a GAN conditioned on the latent embeddings extracted from a pre-trained face recognition model. [SPADE](https://arxiv.org/abs/1903.07291) and [AdaIN](https://arxiv.org/abs/1905.01723) modules are incorporated in order to inject semantic priors to the networks. 
+![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_dis.png)
 
-During training phase, the input face A is heavily blurred and we train the model with resonctruction loss. Other objectives that aim to improve translation result while keeping semantic consistency, e.g., perceptual loss on RGB output and cosine similarity loss on latent embeddings, are also introduced.
+The above image illustrates our generator, which is a encoder-decoder based network, at test phase. Our swap-them-all approach is basically a GAN conditioned on the latent embeddings extracted from a pre-trained face recognition model. [SPADE](https://arxiv.org/abs/1903.07291) and [AdaIN](https://arxiv.org/abs/1905.01723) modules are incorporated in order to inject semantic priors to the networks. During training phase, the input face A is heavily blurred and we train the model with resonctruction loss. Other objectives that aimed to improve translation performance while keeping semantic consistency, e.g., perceptual loss on rgb output and cosine similarity loss on laten embeddings, are also introduced.
 
 ### Things that didn't work
 
@@ -24,4 +24,5 @@ During training phase, the input face A is heavily blurred and we train the mode
 ## References
 1. [Semantic Image Synthesis with Spatially-Adaptive Normalization](https://github.com/shaoanlu/faceswap-GAN)
 2. [Few-Shot Unsupervised Image-to-Image Translation](https://arxiv.org/abs/1905.01723)
+3. [DEEP LEARNING FOR FASHION AND FORENSICS](https://drum.lib.umd.edu/handle/1903/21337)
 
