@@ -22,7 +22,7 @@ The above image illustrates our generator, which is a encoder-decoder based netw
 1. We tried to distort (spline warp, downsample) the input image as in [faceswap-GAN](https://github.com/shaoanlu/faceswap-GAN) instead of masking it. However, the model did not learn proper identity translation but output face that is similar to its input.
 
 ## References
-1. [Semantic Image Synthesis with Spatially-Adaptive Normalization](https://github.com/shaoanlu/faceswap-GAN)
+1. [Semantic Image Synthesis with Spatially-Adaptive Normalization](https://arxiv.org/abs/1903.07291)
 2. [Few-Shot Unsupervised Image-to-Image Translation](https://arxiv.org/abs/1905.01723)
 3. [DEEP LEARNING FOR FASHION AND FORENSICS](https://drum.lib.umd.edu/handle/1903/21337)
 
