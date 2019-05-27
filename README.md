@@ -11,7 +11,7 @@ Our model is still very data sentitive, i.e., when feeding identities that the m
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/result2.jpg)
 
 ## Architecture
-![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation.png.jpg)
+![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation.png)
 
 The above image illustrates our generator, which is a encoder-decoder based network, at test phase. Our swap-them-all approach is basically a GAN conditioned on the latent embeddings extracted from a pre-trained face recognition model. [SPADE](https://arxiv.org/abs/1903.07291) and [AdaIN](https://arxiv.org/abs/1905.01723) modules are incorporated in order to inject semantic priors to the networks. During training phase, the input face A is heavily blurred and we train the model with resonctruction loss. Other objectives that aimed to improve translation performance while keeping semantic consistency, e.g., perceptual loss on rgb output and cosine similarity loss on laten embeddings, are also introduced.
 
