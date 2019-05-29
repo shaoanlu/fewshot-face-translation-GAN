@@ -25,7 +25,9 @@ However, our model has suboptimal performance in terms of translating to asian f
 
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_dis.png)
 
-The above image illustrates our generator, which is a encoder-decoder based network, at test phase. Our swap-them-all approach is basically a GAN conditioned on the latent embeddings extracted from a pre-trained face recognition model. [SPADE](https://arxiv.org/abs/1903.07291) and [AdaIN](https://arxiv.org/abs/1905.01723) modules are incorporated in order to inject semantic priors to the networks. During training phase, the input face A is heavily blurred and we train the model with resonctruction loss. Other objectives that aimed to improve translation performance while keeping semantic consistency, e.g., perceptual loss on rgb output and cosine similarity loss on laten embeddings, are also introduced.
+The above image illustrates our generator, which is a encoder-decoder based network, at test phase. Our swap-them-all approach is basically a GAN conditioned on the latent embeddings extracted from a pre-trained face recognition model. [SPADE](https://arxiv.org/abs/1903.07291) and [AdaIN](https://arxiv.org/abs/1905.01723) modules are incorporated in order to inject semantic priors to the networks. 
+
+During training phase, the input face A is heavily blurred and we train the model with resonctruction loss. Other objectives that aimed to improve translation performance while keeping semantic consistency, such as perceptual loss on rgb output and cosine similarity loss on latent embeddings, are also introduced.
 
 ### Things that didn't work
 
