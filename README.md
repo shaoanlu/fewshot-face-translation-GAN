@@ -1,7 +1,9 @@
 # Few-shot face translation
 A GAN based approach for one model to swap them all.
 
-The following figures illustrate our priliminary face-swapping results using <=5 photos of target face. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is a subset of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). All 281 results of these identities can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
+The figure below illustrates our priliminary face-swapping results requiring one source face and <=5 target face photos. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is a subset of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). All 281 results of these identities can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
+
+Also, our model is capable of producing faces that has its gaze direction, glasses, and hiar occlusions being consistent with given source face. However, our model has suboptimal performance in terms of translating to asian faces. This is possibly due to limited representability of the feature extractor.
 
 |   |[Andrej Karpathy](https://twitter.com/karpathy)|[Andrew Y. Ng](https://en.wikipedia.org/wiki/Andrew_Ng)|[Du Fu](https://en.wikipedia.org/wiki/Du_Fu)|[Elon Musk](https://en.wikipedia.org/wiki/Elon_Musk)|[Fei-Fei Li](https://en.wikipedia.org/wiki/Fei-Fei_Li)|[Geoffrey Hinton](https://en.wikipedia.org/wiki/Geoffrey_Hinton)|[Stephen Curry](https://en.wikipedia.org/wiki/Stephen_Curry)|[Yann Lecun](https://en.wikipedia.org/wiki/Yann_LeCun)|[Yoshua Benjio](https://en.wikipedia.org/wiki/Yoshua_Bengio)|
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
@@ -17,8 +19,6 @@ The following figures illustrate our priliminary face-swapping results using <=5
 | |<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|<img width=128/>|
 
 #### I really like the Du Fu translation: such an interesting demostration how the GAN imagine the appearance of the prominent Chinese poet from just a painting.
-
-However, our model has suboptimal performance in terms of translating to asian faces. This is possibly due to limited representability of the feature extractor.
 
 ## Architecture
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_gen.png)
