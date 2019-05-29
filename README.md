@@ -18,7 +18,7 @@ The following figures illustrate our priliminary face-swapping results using <=5
 
 #### I really like the Du Fu translation: such an interesting demostration how the GAN imagine the appearance of the prominent Chinese poet from just a painting.
 
-However, our model is still very data sentitive, i.e., when feeding identities that the model had never seem before or are outside training data distribution (such as asian faces that are scarce in VGGFace2), our GAN failed at genereating faces with high fidelity.
+However, our model has suboptimal performance on translating to asian faces due to the limited representability of the feature extractor.
 
 ## Architecture
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_gen.png)
