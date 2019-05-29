@@ -1,7 +1,7 @@
 # Few-shot face translation
 A GAN based approach for one model to swap them all.
 
-The following figures illustrate our priliminary face-swapping results using <=5 photos of target face. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is part of of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). More results of these identities can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
+The following figures illustrate our priliminary face-swapping results using <=5 photos of target face. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is part of of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). All 281 results of these identities can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
 
 |   |[Andrej Karpathy](https://twitter.com/karpathy)|[Andrew Y. Ng](https://en.wikipedia.org/wiki/Andrew_Ng)|[Du Fu](https://en.wikipedia.org/wiki/Du_Fu)|[Elon Musk](https://en.wikipedia.org/wiki/Elon_Musk)|[Fei-Fei Li](https://en.wikipedia.org/wiki/Fei-Fei_Li)|[Geoffrey Hinton](https://en.wikipedia.org/wiki/Geoffrey_Hinton)|[Stephen Curry](https://en.wikipedia.org/wiki/Stephen_Curry)|[Yann Lecun](https://en.wikipedia.org/wiki/Yann_LeCun)|[Yoshua Benjio](https://en.wikipedia.org/wiki/Yoshua_Bengio)|
 |:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
