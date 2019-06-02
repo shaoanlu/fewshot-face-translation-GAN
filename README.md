@@ -22,6 +22,9 @@ Also, our model is capable of producing faces that has its gaze direction, glass
 
 #### I really like the Du Fu translation: such an interesting demostration how the GAN imagine the appearance of the prominent Chinese poet from just a painting.
 
+## Run on Google Colaboratory
+ [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
+
 ## Architecture
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_gen.png)
 
@@ -34,6 +37,11 @@ During training phase, the input face A is heavily blurred and we train the mode
 ### Things that didn't work
 
 1. We tried to distort (spline warp, downsample) the input image as in [faceswap-GAN](https://github.com/shaoanlu/faceswap-GAN) instead of masking it. However, the model did not learn proper identity translation but output face that is similar to its input.
+
+## Requirements
+  - Python 3.6
+  - Keras 2.2.4
+  - TensorFlow 1.12.0 or 1.13.1
 
 ## References
 1. [Semantic Image Synthesis with Spatially-Adaptive Normalization](https://arxiv.org/abs/1903.07291)
