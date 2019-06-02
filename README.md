@@ -24,6 +24,8 @@ Also, our model is capable of producing faces that has its gaze direction, glass
 
 ## Run on Google Colaboratory
  [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
+ 
+ #### For now, we only provide pre-trained weights and inference script. Training script will be released after code cleanup.
 
 ## Architecture
 ![](https://github.com/shaoanlu/faceswap-GAN-swap-them-all/raw/master/images/few_shot_face_translation_gen.png)
