@@ -42,6 +42,7 @@ During training phase, the input face A is heavily blurred and we train the mode
   - Python 3.6
   - Keras 2.2.4
   - TensorFlow 1.12.0 or 1.13.1
+  - [face_toolbox_keras](https://github.com/shaoanlu/face_toolbox_keras)
 
 ## References
 1. [Semantic Image Synthesis with Spatially-Adaptive Normalization](https://arxiv.org/abs/1903.07291)
