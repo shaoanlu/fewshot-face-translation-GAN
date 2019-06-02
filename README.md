@@ -2,7 +2,7 @@
 
 A GAN based approach for one model to swap them all. 
 
-The figure below illustrates our priliminary face-swapping results requiring one source face and <=5 target face photos. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is a subset of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). All 281 results of these identities can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
+The figure below illustrates our priliminary face-swapping results requiring one source face and <=5 target face photos. Notice that almost all of the identities, except Stephen Curry, are not in our training data (which is a subset of [VGGFace2](http://www.robots.ox.ac.uk/~vgg/data/vgg_face2/)). More translation results can be found [here](https://github.com/shaoanlu/fewshot-face-translation-GAN/tree/master/images/translation_results).
 
 Also, our model is capable of producing faces that has its gaze direction, glasses, and hiar occlusions being consistent with given source face. However, our model has suboptimal performance in terms of translating to asian faces. This is possibly due to limited representability of the feature extractor.
 
@@ -21,9 +21,8 @@ Also, our model is capable of producing faces that has its gaze direction, glass
 
 #### I really like the Du Fu translation: such an interesting demostration how the GAN imagine the appearance of the prominent Chinese poet from just a painting.
 
-## Run on Google Colaboratory
- [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
- 
+## Run on Google Colaboratory [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
+
 ###### We only provide pre-trained weights and inference script for now. Training script will be released after code cleanup.
 
 ## Architecture
