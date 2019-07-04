@@ -21,7 +21,7 @@ Also, our model is capable of producing faces that has its gaze direction, glass
 
 #### I really like the Du Fu translation: such an interesting demostration how the GAN imagine the appearance of the prominent Chinese poet from just a painting.
 
-## Run in Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
+## Try in Google Colab [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/shaoanlu/fewshot-face-translation-GAN/blob/master/colab_demo.ipynb)
 
 ###### We only provide pre-trained weights and inference script for now. Training script will be released after code cleanup.
 
