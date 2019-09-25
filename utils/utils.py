@@ -219,6 +219,7 @@ def get_tar_inputs(fns, fd, fv):
         emb_tar = fv.extract_embeddings(aligned_face)
         emb_avg_tar += emb_tar
     emb_avg_tar /= len(fns)
+    emb_avg_tar = emb_avg_tar / np.linalg.norm(emb_avg_tar, 2)
     return aligned_face, emb_avg_tar
 
 def get_feather_blend_mask(im):
