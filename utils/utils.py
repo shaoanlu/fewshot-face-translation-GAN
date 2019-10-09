@@ -161,7 +161,7 @@ def auto_resize(im, max_size=768):
         im = cv2.resize(im, (0,0), fx=ratio, fy=ratio)
     return im
 
-def get_src_inputs(fn, fd, fp, idet):
+def get_src_inputs(fn, fd, fp, idet, identity_extractor):
     """
     Inputs:
         fn: A string. Path to a image file.
@@ -186,29 +186,44 @@ def get_src_inputs(fn, fd, fp, idet):
     segm_mask = get_segm_mask(aligned_im, aligned_face, x0, y0, x1, y1, landmarks2)
     
     colored_parsing_map = parse_face(aligned_face, segm_mask, fp=fp)
-    eyes_mask = get_eyes_mask(colored_parsing_map)
     
-    eyes_lms = detect_irises(aligned_im, idet, landmarks2)
-    eyes_lms = eyes_lms - np.array([[[x0, y0]]])
-    parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
-    return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
+    if identity_extractor.lower() == "inceptionresnetv1":
+        eyes_mask = get_eyes_mask(colored_parsing_map)
+        eyes_lms = detect_irises(aligned_im, idet, landmarks2)
+        eyes_lms = eyes_lms - np.array([[[x0, y0]]])
+        parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
+        return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
+    elif identity_extractor.lower() == "ir50_hybrid":
+        return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
+    else:
+        raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
   
-def get_tar_inputs(fns, fd, fv):
+def get_tar_inputs(fns, fd, fv, identity_extractor):
     """
     Inputs:
-        fn: A string or a list. Path to a image file(s).
-        fd: An instance of FaceAlignmentDetector. Face detector in face_toolbox_keras. 
-        fv: An instance of FaceVerifier. Face verificaiton model in face_toolbox_keras.
+        fn: A string or a list of strings. Path to a image file(s).
+        fd: An instance of FaceAlignmentDetector. Face detector model in face_toolbox_keras. 
+        fv: An instance or a list of instances of FaceVerifier. Face verificaiton model(s) in face_toolbox_keras.
     Outputs:
         aligned_face: A RGB image.
-        emb_tar: A numpy array of shape (512,). Latent embeddings of aligned_face.
+        emb_tar: A numpy array of shape (512,) or (1024,). Latent embeddings of aligned_face.
+
+    TODO:
+        Only one aligned_face will be returned, should be refined.
     """
     if not type(fns) == list:
         if type(fns) == str:
             fns = [fns]
         else:
             raise ValueError("Received and unknown filename type. fns shoulbe be a list or a string.")
-    emb_avg_tar = np.zeros((1, 512))
+    if identity_extractor.lower() == "inceptionresnetv1":
+        latent_dim = 512
+    elif identity_extractor.lower() == "ir50_hybrid":
+        latent_dim = 1024
+    else:
+        raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
+    emb_avg_tar = np.zeros((1, latent_dim))
+
     for fn in fns:
         im = cv2.imread(fn)[..., ::-1]
         im = auto_resize(im)
@@ -216,10 +231,22 @@ def get_tar_inputs(fns, fd, fv):
         aligned_im = align_image(im, x0, y0, x1, y1, landmarks)    
         (x0, y0, x1, y1), landmarks2 = detect_face(aligned_im, fd, with_landmarks=False)
         aligned_face = aligned_im[x0:x1, y0:y1, :].copy()
-        emb_tar = fv.extract_embeddings(aligned_face)
+        if identity_extractor.lower() == "inceptionresnetv1":
+            emb_tar = fv.extract_embeddings(aligned_face)
+        elif identity_extractor.lower() == "ir50_hybrid":
+            assert isinstance(fv, list)
+            emb_tar_list = [v.extract_embeddings(aligned_face) for v in fv]
+            emb_tar = np.concatenate(emb_tar_list, axis=-1)            
         emb_avg_tar += emb_tar
+        
     emb_avg_tar /= len(fns)
-    emb_avg_tar = emb_avg_tar / np.linalg.norm(emb_avg_tar, 2)
+    if identity_extractor.lower() == "ir50_hybrid":
+        # Note: np.split() returns views.
+        emb_avg_tar_asia, emb_avg_tar_ms1m = np.split(emb_avg_tar, 2, axis=-1)
+        emb_avg_tar_asia /= np.linalg.norm(emb_avg_tar_asia, 2, axis=-1)
+        emb_avg_tar_ms1m /= np.linalg.norm(emb_avg_tar_ms1m, 2, axis=-1)
+        #emb_avg_tar = np.concatenate([emb_avg_tar_asia, emb_avg_tar_ms1m], axis=-1)
+        assert emb_avg_tar.shape[-1] == 1024
     return aligned_face, emb_avg_tar
 
 def get_feather_blend_mask(im):
