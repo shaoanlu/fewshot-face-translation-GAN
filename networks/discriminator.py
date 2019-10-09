@@ -4,7 +4,7 @@ from keras.layers.advanced_activations import LeakyReLU
 
 from .nn_blocks import *
 
-def discriminator_perceptually_aware(nc_in, input_size=IMAGE_SHAPE[0], vggface_res50=None):    
+def discriminator_perceptually_aware(nc_in, input_size=224, vggface_res50=None):    
     inp1 = Input(shape=(input_size, input_size, nc_in))
     inp2 = Input(shape=(input_size, input_size, nc_in))   
     
@@ -50,3 +50,26 @@ def discriminator(nc_in, input_size=224):
     x = conv_block_d(x, 512, False, strides=1)
     out = Conv2D(1, kernel_size=4, use_bias=False, padding="same")(x)   
     return Model(inputs=[inp, inp_segm], outputs=out) 
+
+def discriminator_conditional(nc_in, input_size=224, latent_dim=512):    
+    inp = Input(shape=(input_size, input_size, nc_in))
+    inp_segm = Input(shape=(input_size, input_size, nc_in))
+    x = concatenate([inp, inp_segm])
+    
+    nc_base = 64
+    x = conv_block_d(x, 32, False)
+    x = conv_block_d(x, 32, False)
+    x = conv_block_d(x, 64, True)
+    x = conv_block_d(x, 128, True)
+    x = res_block(x, 128)
+    x = conv_block_d(x, 256, True)
+    x = res_block(x, 256)
+    x = conv_block_d(x, 512, False, strides=1)
+    out1 = Conv2D(1, kernel_size=4, kernel_initializer=conv_init, use_bias=False, padding="same")(x)   
+    
+    x = GlobalAveragePooling2D(name="emb_branch_gap")(x)
+    x = fully_connected(x, 256, activ="relu", name="emb_branch_dense01")
+    x = fully_connected(x, 256, activ="relu", name="emb_branch_dense02")
+    out2 = fully_connected(x, latent_dim, activ=None, name="emb_branch_output")
+    
+    return Model(inputs=[inp, inp_segm], outputs=[out1, out2]) 

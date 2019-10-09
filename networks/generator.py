@@ -23,20 +23,20 @@ def encoder(nc_in=3, input_size=224):
         ]
     )
 
-def decoder(nc_conv_in=512, input_size=14, nc_in=3, latent_dim=512):
+def decoder(nc_conv_in=512, input_size=14, nc_in=3, num_fc=3, latent_dim=512, sep_mean_var=False):
     conv4 = Input(shape=(input_size, input_size, nc_conv_in))
     inp_segm_mask = Input(shape=(input_size, input_size, nc_in))
     inp_ds2 = Input(shape=(input_size*8, input_size*8, nc_in))
     inp_ds4 = Input(shape=(input_size*4, input_size*4, nc_in))
     inp_emb = Input(shape=(latent_dim,))
     
-    emb_mean_var = embddding_fc_block(inp_emb)
+    emb_mean_var = embddding_fc_block(inp_emb, num_fc)
     emb_mean_var = Reshape((1, 1, 256))(emb_mean_var)
     emb = Reshape((1, 1, latent_dim))(inp_emb)
     emb = UpSampling2D((input_size,input_size))(emb)
     
-    x = adain_resblock(conv4, emb_mean_var, 512) 
-    x = adain_resblock(x, emb_mean_var, 512)   
+    x = adain_resblock(conv4, emb_mean_var, 512, sep_mean_var) 
+    x = adain_resblock(x, emb_mean_var, 512, sep_mean_var)   
     x = concatenate([x, emb])
     x = upscale_nn(x, 512)
     x = SPADE_res_block(x, resize_tensor(inp_segm_mask, [input_size*2, input_size*2]), 512, block_id='3')

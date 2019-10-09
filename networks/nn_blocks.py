@@ -1,6 +1,7 @@
 from keras.layers import *
 from keras.layers.advanced_activations import LeakyReLU
 import tensorflow as tf
+from keras import regularizers
 
 from networks.instance_normalization import InstanceNormalization
 
@@ -11,6 +12,14 @@ norm = "instancenorm"
 def ReflectPadding2D(x, pad=1):
     x = Lambda(lambda x: tf.pad(x, [[0, 0], [pad, pad], [pad, pad], [0, 0]], mode='REFLECT'))(x)
     return x
+
+def fully_connected(x, num_node, activ="relu", name=None):
+    return Dense(
+        num_node, 
+        activation=activ, 
+        kernel_regularizer=regularizers.l2(w_l2),
+        bias_regularizer=regularizers.l2(w_l2), 
+        name=name)(x)
 
 def normalization(inp, norm='none', group='16'):    
     x = inp
@@ -63,21 +72,16 @@ def res_block(input_tensor, f, use_norm=True):
     x = Activation('relu')(x)
     return x
 
-def embddding_fc_block(input_tensor):
+def embddding_fc_block(input_tensor, num_fc=3):
     x = input_tensor
     
-    x = Dense(256, kernel_regularizer=regularizers.l2(w_l2))(x)
-    x = normalization(x, norm, 256)
-    x = Activation('relu')(x)
-    x = Dense(256, kernel_regularizer=regularizers.l2(w_l2))(x)
-    x = normalization(x, norm, 256)
-    x = Activation('relu')(x)
-    x = Dense(256, kernel_regularizer=regularizers.l2(w_l2))(x)
-    x = normalization(x, norm, 256)
-    x = Activation('relu')(x)
+    for _ in range(num_fc):
+        x = Dense(256, kernel_regularizer=regularizers.l2(w_l2))(x)
+        x = normalization(x, norm, 256)
+        x = Activation('relu')(x)
     return x
 
-def adain_resblock(input_tensor, embeddings, f):
+def adain_resblock(input_tensor, embeddings, f, sep_mean_var=False):
     # conv -> norm -> activ -> conv -> norm -> add
     def AdaIN(content, style_var, style_mean, epsilon=1e-5):
         meanC, varC = tf.nn.moments(content, [1, 2], keep_dims=True)
@@ -85,18 +89,24 @@ def adain_resblock(input_tensor, embeddings, f):
         return (content - meanC) * style_var / sigmaC + style_mean
     
     x = input_tensor
-    style_var = Conv2D(f, 1, strides=1)(embeddings)
-    style_mean = Conv2D(f, 1, strides=1)(embeddings)
+    style_var1 = Conv2D(f, 1, strides=1)(embeddings)
+    style_mean1 = Conv2D(f, 1, strides=1)(embeddings)
+    if sep_mean_var:
+        style_var2 = Conv2D(f, 1, strides=1)(embeddings)
+        style_mean2 = Conv2D(f, 1, strides=1)(embeddings)        
     
     x = ReflectPadding2D(x)
     x = Conv2D(f, kernel_size=3, kernel_regularizer=regularizers.l2(w_l2), 
                kernel_initializer=conv_init, use_bias=False)(x)
-    x = Lambda(lambda x: AdaIN(x[0], x[1], x[2]))([x, style_var, style_mean])
+    x = Lambda(lambda x: AdaIN(x[0], x[1], x[2]))([x, style_var1, style_mean1])
     x = Activation('relu')(x)
     x = ReflectPadding2D(x)
     x = Conv2D(f, kernel_size=3, kernel_regularizer=regularizers.l2(w_l2), 
                kernel_initializer=conv_init, use_bias=False)(x)
-    x = Lambda(lambda x: AdaIN(x[0], x[1], x[2]))([x, style_var, style_mean])
+    if sep_mean_var:
+        x = Lambda(lambda x: AdaIN(x[0], x[1], x[2]))([x, style_var2, style_mean2])
+    else:
+        x = Lambda(lambda x: AdaIN(x[0], x[1], x[2]))([x, style_var1, style_mean1])
     x = add([x, input_tensor])
     x = Activation('relu')(x)
     return x
