@@ -19,13 +19,13 @@ random_transform_args = {
 # ====================
 
 def get_random_transform_matrix(image, rotation_range, zoom_range, shift_range, random_flip):
-    h,w = image.shape[0:2]
+    h, w = image.shape[0:2]
     rotation = np.random.uniform(-rotation_range, rotation_range)
-    scale = np.random.uniform(1, 1 + zoom_range )
+    scale = np.random.uniform(1, 1 + zoom_range)
     tx = np.random.uniform(-shift_range, shift_range) * w
     ty = np.random.uniform(-shift_range, shift_range) * h
-    mat = cv2.getRotationMatrix2D( (w//2,h//2), rotation, scale)
-    mat[:,2] += (tx,ty)
+    mat = cv2.getRotationMatrix2D((w//2,h//2), rotation, scale)
+    mat[:, 2] += (tx, ty)
     return mat
 
 def get_random_identity(exclude_identity=None, all_identities=[]):
@@ -63,15 +63,13 @@ def get_blurred_rgb(rgb, segm, landmark_segm):
     face_mask = np.max(face_mask, axis=-1, keepdims=True).astype(np.float32)
     kernel_size = face_mask.shape[0] // 20
     kernel_size += (kernel_size % 2) - 1
-    #face_mask = cv2.erode(face_mask.astype(np.uint8), np.ones((kernel_size, kernel_size)))
     face_mask = cv2.GaussianBlur(face_mask.astype(np.uint8), (kernel_size, kernel_size), 0)
     face_mask = face_mask.astype(np.float32) / 255
     face_mask = face_mask[..., np.newaxis]
     ratio = np.random.randint(8,64) / face_mask.shape[0]
     interp1, interp2 = np.random.choice([cv2.INTER_CUBIC, cv2.INTER_LINEAR], 2)
     blurred_rgb = cv2.resize(rgb.copy(), (0,0), fx=ratio, fy=ratio, interpolation=interp1)
-    blurred_rgb = cv2.resize(blurred_rgb, (0,0), fx=1/ratio, fy=1/ratio, interpolation=interp2)
-    
+    blurred_rgb = cv2.resize(blurred_rgb, (0,0), fx=1/ratio, fy=1/ratio, interpolation=interp2)    
     blurred_rgb = face_mask * blurred_rgb + (1 - face_mask) * rgb    
     return blurred_rgb
 
@@ -227,12 +225,12 @@ def minibatch(config):
         
     rand_fn_generator = RandomFilenameGenerator(dict_fns_img)
     while True:
-        rgb_gt_src = np.zeros((batch_size,)+image_shape)
-        rgb_rand_src = np.zeros((batch_size,)+image_shape)
-        rgb_tar = np.zeros((batch_size,)+image_shape)
-        segm_src = np.zeros((batch_size,)+image_shape)
-        rgb_inp_src = np.zeros((batch_size,)+image_shape)
-        non_face_mask_src = np.zeros((batch_size,)+image_shape)
+        rgb_gt_src = np.zeros((batch_size, ) + image_shape)
+        rgb_rand_src = np.zeros((batch_size, ) + image_shape)
+        rgb_tar = np.zeros((batch_size, ) + image_shape)
+        segm_src = np.zeros((batch_size, ) + image_shape)
+        rgb_inp_src = np.zeros((batch_size, ) + image_shape)
+        non_face_mask_src = np.zeros((batch_size, ) + image_shape)
         
         for i in range(batch_size):
             id_src = get_random_identity(all_identities=all_identities)
