@@ -65,11 +65,11 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
         if self.identity_extractor == "inceptionresnetv1":
             self.latent_dim = int(config["latent_dim"])
             self.num_fc = 3
-            self.adain_sep_mean_var = False
+            self.adain_sep_mean_var = config["separate_adain"]
         elif self.identity_extractor == "ir50_hybrid":
             self.latent_dim = int(config["latent_dim"]) * 2
             self.num_fc = 5
-            self.adain_sep_mean_var = True
+            self.adain_sep_mean_var = config["separate_adain"]
         else:
             raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
         
@@ -106,15 +106,24 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
             ])
 
 class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
+    """This class is for model training.
+
+        # Arguments
+            config: Dictionary. Stores all configurations for experiments.
+    """
     def __init__(self, config):
         super().__init__(config=config)
 
         if self.identity_extractor == "inceptionresnetv1":
-            raise NotImplementedError()
+            self.latent_dim = int(config["latent_dim"])
+            self.num_fc = 3
+            self.adain_sep_mean_var = config["separate_adain"]
+            self.sep_emb = False
         elif self.identity_extractor == "ir50_hybrid":
             self.latent_dim = int(config["latent_dim"]) * 2
             self.num_fc = 5
-            self.adain_sep_mean_var = True
+            self.adain_sep_mean_var = config["separate_adain"]
+            self.sep_emb = True
         else:
             raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
         
@@ -175,6 +184,11 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         Descriptions:
             x: source identity
             y: target identity
+
+        Tricks:
+            - Mixup in the latent space
+                The mixed-up embeddings are normalized since they are
+                compared in consine distance, which expects unit length.
         """
         self.rgb_gt_tensor = Input(shape=(self.input_size, self.input_size, 3))
         self.rgb_gt_rand_tensor = Input(shape=(self.input_size, self.input_size, 3))
@@ -186,22 +200,15 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.emb_src_rand = self.net_extractor(self.rgb_gt_rand_tensor)
         self.emb_src_gt = self.net_extractor(self.rgb_gt_tensor)
         self.emb_src_inp = self.net_extractor(self.rgb_inp_tensor)
-        #self.emb_src_rand_asia = Lambda(lambda x: x[..., :latent_dim//2])(self.emb_src_rand)
-        #self.emb_src_rand_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(self.emb_src_rand)
-        #self.emb_src_gt_asia = Lambda(lambda x: x[..., :latent_dim//2])(self.emb_src_gt)
-        #self.emb_src_gt_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(self.emb_src_gt)
-        #self.emb_src_inp_asia = Lambda(lambda x: x[..., :latent_dim//2])(self.emb_src_inp)
-        #self.emb_src_inp_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(self.emb_src_inp)
 
         self.rgb_tar_tensor = Input(shape=(self.input_size, self.input_size, 3))
         self.emb_tar = self.net_extractor(self.rgb_tar_tensor)
-        #self.emb_tar_asia = Lambda(lambda x: x[..., :latent_dim//2])(emb_tar)
-        #self.emb_tar_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(emb_tar)
 
         dist_emb = Beta(0.3, 0.3)
         if self.identity_extractor == "inceptionresnetv1":
             lam_emb = dist_emb.sample()
             self.emb_src_mixed = lam_emb_asia * self.emb_src_gt + (1 - lam_emb) * self.emb_src_rand
+            self.emb_src_mixed = K.l2_normalize(self.emb_src_mixed)
         elif self.identity_extractor == "ir50_hybrid":
             lam_emb_asia = dist_emb.sample()
             lam_emb_ms1m = dist_emb.sample()
@@ -220,8 +227,13 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.segm_tensor,
             self.emb_src_mixed) #
         self.emb_recon_tensor = self.net_extractor(self.rgb_recon_tensor)
-        #self.emb_recon_tensor_asia = Lambda(lambda x: x[..., :latent_dim//2])(self.emb_recon_tensor)
-        #self.emb_recon_tensor_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(self.emb_recon_tensor)
+
+        # x_gt -> x_recon
+        self.rgb_recon_tensor2 = self.forward_path(
+            self.rgb_gt_tensor, #
+            self.rgb_gt_rand_tensor, 
+            self.segm_tensor,
+            self.emb_src_mixed) #
 
         # x_blurred -> y_recon
         self.rgb_recon_tar_tensor = self.forward_path(
@@ -240,8 +252,6 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         # x_blurred -> y_recon -> x_recon_recon
         self.emb_recon_tar_tensor = self.net_extractor(self.rgb_recon_tar_tensor)
         self.emb_recon_tar_tensor2 = self.net_extractor(self.rgb_recon_tar_tensor2)
-        #self.emb_recon_tar_tensor_asia = Lambda(lambda x: x[..., :latent_dim//2])(self.emb_recon_tar_tensor)
-        #self.emb_recon_tar_tensor_ms1m = Lambda(lambda x: x[..., latent_dim//2:])(self.emb_recon_tar_tensor)
         self.rgb_cyclic_tensor =  self.forward_path(
             self.rgb_recon_tar_tensor, 
             self.rgb_gt_rand_tensor, 
@@ -256,6 +266,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
     def define_losses(self):
         from networks.losses import adversarial_loss, reconstruction_loss, embeddings_hinge_loss
         from networks.losses import relative_embeddings_loss, semantic_consistency_loss, adversarial_loss_paired
+        from networks.losses import perceptual_loss
 
         w_adv = self.config["loss"]["w_adv"]
         w_adv2 = self.config["loss"]["w_adv2"]
@@ -264,10 +275,8 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         w_cyc = self.config["loss"]["w_cyc"]
         w_emb = self.config["loss"]["w_emb1"]
         w_emb2 = self.config["loss"]["w_emb2"]
-        #w_pl = self.config["loss"]["w_pl"]
+        w_pl = self.config["loss"]["w_pl"]
         w_sl = self.config["loss"]["w_sl"]
-
-        sep_emb = True if self.identity_extractor == "ir50_hybrid" else False
 
         # Adversarial loss
         self.loss_gen_adv, self.loss_dis = adversarial_loss(
@@ -277,6 +286,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.segm_tensor,
             self.emb_src_gt,
             self.rgb_recon_tar_tensor2,
+            self.emb_tar,
             w_adv
         )
         self.loss_gen = self.loss_gen_adv 
@@ -285,6 +295,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.loss_gen_rec = reconstruction_loss(
             self.rgb_gt_tensor, 
             self.rgb_recon_tensor,
+            self.rgb_recon_tar_tensor,
             self.rgb_recon_tar_tensor2,
             w_recon
             )
@@ -295,19 +306,12 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.emb_recon_tensor, 
             self.emb_src_rand, 
             w_adv,
-            sep_emb=sep_emb)
-        #self.loss_gen_emb = embeddings_hinge_loss(
-        #    self.emb_recon_tensor_asia, 
-        #    self.emb_src_rand_asia, 
-        #    w_adv)
-        #self.loss_gen_emb += embeddings_hinge_loss(
-        #    self.emb_recon_tensor_ms1m, 
-        #    self.emb_src_rand_ms1m, 
-        #    w_adv)
+            sep_emb=self.sep_emb)
         self.loss_gen += self.loss_gen_emb
 
         # Perceptual loss
-        # Pass
+        loss_pl = perceptual_loss(self.vggface_feats, x_gt, x_recon, w_pl)
+        self.loss_gen += loss_pl
 
         # Laten embedding loss 2
         # recon_tar should be close to tar face and far from src face
@@ -316,42 +320,20 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.emb_tar, 
             w_adv,
             m=0.25,
-            sep_emb=sep_emb)
+            sep_emb=self.sep_emb)
         self.loss_gen_emb_relative = relative_embeddings_loss(
             self.emb_recon_tar_tensor2, 
             self.emb_tar, 
             self.emb_src_gt,
             w_emb2,
             m=0.5,
-            sep_emb=sep_emb)
-        #self.loss_gen_emb2 = embeddings_hinge_loss(
-        #    self.emb_recon_tar_tensor2_asia, 
-        #    self.emb_tar_asia, 
-        #    w_emb2, 
-        #    m=0.25) 
-        #self.loss_gen_emb2 += embeddings_hinge_loss(
-        #    self.emb_recon_tar_tensor2_ms1m, 
-        #    self.emb_tar_ms1m, 
-        #    w_emb2, 
-        #    m=0.25) 
-        #self.loss_gen_emb_relative = relative_embeddings_loss(
-        #    self.emb_recon_tar_tensor2_asia, 
-        #    self.emb_tar_asia, 
-        #    self.emb_src_gt_asia,
-        #    w_emb2,
-        #    m=0.5)
-        #self.loss_gen_emb_relative += relative_embeddings_loss(
-        #    self.emb_recon_tar_tensor2_ms1m, 
-        #    self.emb_tar_ms1m, 
-        #    self.emb_src_gt_ms1m,
-        #    w_emb2,
-        #    m=0.5)
+            sep_emb=self.sep_emb)
         self.loss_gen2 = self.loss_gen_emb2
         self.loss_gen2 += self.loss_gen_emb_relative
 
         # Cyclic loss
         self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor - self.rgb_gt_tensor))
-        self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor2 - self.rgb_gt_tensor))
+        self.loss_cyc += w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor2 - self.rgb_gt_tensor))
         self.loss_gen2 += self.loss_cyc
 
         # Adversarial loss paired
@@ -374,9 +356,13 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.loss_gen2 += self.loss_hair_consistency
 
         # semantic consistency loss
+        # By using BiSeNet as an auxiliary network,
+        # The generator was able to learn gaze-aware translation without iris detection in parsing maps.
+        # TODO: Use interm. layers' output instead of final output for L1 (L2?) loss.
         self.loss_gen_sl = semantic_consistency_loss(
             self.bisenet, 
             self.rgb_gt_tensor, 
+            self.rgb_recon_tensor2,
             self.rgb_recon_tar_tensor2, 
             w_sl)
         self.loss_gen2 += self.loss_gen_sl
@@ -452,21 +438,12 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         def build_hybrid_identity_extractor(weights_path=None):
             from face_toolbox_keras.models.verifier.face_evoLVe_ir50.ir50 import IR50
             input_tensor = Input((None, None, 3)) 
+            base_path = PurePath("face_toolbox_keras", "models", "verifier", "face_evoLVe_ir50")
             ir50_asia = IR50(
-                weights_path=str(PurePath(
-                    "face_toolbox_keras",
-                    "models",
-                    "verifier",
-                    "face_evoLVe_ir50",
-                    "backbone_ir50_asia_keras.h5")), 
+                weights_path=str(PurePath(base_path / "backbone_ir50_asia_keras.h5")), 
                 model_name="IR50_asia")
             ir50_ms1m = IR50(
-                weights_path=str(PurePath(
-                    "face_toolbox_keras",
-                    "models",
-                    "verifier",
-                    "face_evoLVe_ir50",
-                    "backbone_ir50_ms1m_keras.h5")), 
+                weights_path=str(PurePath(base_path / "backbone_ir50_ms1m_keras.h5")), 
                 model_name="IR50_ms1m")
             preprocess_layer = preprocess_ir50()
             resize_layer = resize_tensor(size=128)
@@ -479,6 +456,53 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.net_extractor = build_hybrid_identity_extractor()
         for layer in self.net_extractor.layers:
             layer.trainable = False
+
+    def build_resnet50_pl_network(self):
+        def preprocess_vggface():
+            input_tensor = Input((None, None, 3))
+            x = Lambda(lambda tensor: tf.image.resize_images(tensor, [226, 226]))(input_tensor)
+            output_tensor = Lambda(lambda tensor: (tensor + 1)/2 * 255 - [131.0912, 103.8827, 91.4953])(x)
+            return Model(input_tensor, output_tensor)
+
+        self.resnet50_feats = Model(
+            self.resnet50.inputs, 
+            [
+                self.resnet50.layers[36].output,
+                self.resnet50.layers[78].output,
+                self.resnet50.layers[140].output,
+                self.resnet50.layers[172].output,
+            ])
+
+        self.resnet50_feats = Model(
+            self.resnet50_feats.inputs, 
+            self.resnet50_feats(preprocess_vggface()(self.resnet50_feats.inputs)),
+        )
+
+    def build_bisenet_pl_network(self):        
+        def preprocess_bisenet(x, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+            """
+            Input:
+                x: rgb tensor [-1, +1]
+            Output:
+                rgb tensor normalize for bisenet
+            """
+            x = (x + 1) / 2 # [-1,+1] to [0,1]
+            x_normalized = (x - mean) / std
+            x_normalized = tf.image.resize_bilinear(x_normalized, [512,512], align_corners=True)
+            return x_normalized
+        self.bisenet_feats = Model(
+            self.bisenet.inputs, 
+            [
+                self.bisenet.layers[44].output,
+                self.bisenet.layers[64].output,
+                self.bisenet.layers[104].output,
+                self.bisenet.layers[115].output,
+            ])
+
+        self.bisenet_feats = Model(
+            self.bisenet_feats.inputs, 
+            self.bisenet_feats(preprocess_bisenet()(self.bisenet_feats.inputs)),
+        )
 
     def get_generator_trainable_weights(self):
         weights_gen = self.encoder.trainable_weights

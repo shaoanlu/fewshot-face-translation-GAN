@@ -81,7 +81,7 @@ def embddding_fc_block(input_tensor, num_fc=3):
         x = Activation('relu')(x)
     return x
 
-def adain_resblock(input_tensor, embeddings, f, sep_mean_var=False):
+def adain_resblock(input_tensor, embeddings, f, sep_mean_var=True):
     # conv -> norm -> activ -> conv -> norm -> add
     def AdaIN(content, style_var, style_mean, epsilon=1e-5):
         meanC, varC = tf.nn.moments(content, [1, 2], keep_dims=True)
