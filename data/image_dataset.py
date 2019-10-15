@@ -125,41 +125,41 @@ def get_data(identity, identity2, dict_fns_img, all_identities, path_trn_data, i
     TODO: Write random_transform_args into config files
     """
     if isinstance(dict_fns_img, dict):
-        rand_fn = np.random.choice(dict_fns_img[identity])
-        rand_fn2 = np.random.choice(dict_fns_img[identity])
+        rand_fn_src = np.random.choice(dict_fns_img[identity])
+        rand_fn_src2 = np.random.choice(dict_fns_img[identity])
         rand_fn_tar = np.random.choice(dict_fns_img[identity2])
     else:
-        rand_fn = dict_fns_img.get_random_filename(identity)
-        rand_fn2 = dict_fns_img.get_random_filename(identity)
+        rand_fn_src = dict_fns_img.get_random_filename(identity)
+        rand_fn_src2 = dict_fns_img.get_random_filename(identity)
         rand_fn_tar = dict_fns_img.get_random_filename(identity2)
-    raw_fn = PurePath(rand_fn).stem
-    rgb = _load_image(rand_fn)
-    rgb2 = _load_image(rand_fn2)
+    raw_fn_src = PurePath(rand_fn_src).stem
+    rgb_src = _load_image(rand_fn_src)
+    rgb_src2 = _load_image(rand_fn_src2)
     rgb_tar = _load_image(rand_fn_tar)
-    segm, non_face_mask = get_parsing_mask(
+    segm_src, non_face_mask = get_parsing_mask(
         identity, 
-        raw_fn, 
+        raw_fn_src, 
         path_trn_data, 
         return_non_face_region=True) 
     non_face_mask = _preprocess_image(non_face_mask, image_shape)
     non_face_mask = (non_face_mask + 1) / 2
-    segm = _preprocess_image(segm, image_shape)
-    landmark_segm = get_segmentation_mask(identity, raw_fn, path_trn_data)
+    segm_src = _preprocess_image(segm_src, image_shape)
+    landmark_segm = get_segmentation_mask(identity, raw_fn_src, path_trn_data)
     landmark_segm = _preprocess_image(landmark_segm, image_shape)
     
     if np.random.uniform() <= 0.25:
-        rgb = random_color_match(rgb, rgb_tar) # ressize to (256,256)
-    rgb = _preprocess_image(rgb, image_shape)
-    rgb2 = _preprocess_image(rgb2, image_shape)
+        rgb_src = random_color_match(rgb_src, rgb_tar) # ressize to (256,256)
+    rgb_src = _preprocess_image(rgb_src, image_shape)
+    rgb_src2 = _preprocess_image(rgb_src2, image_shape)
     rgb_tar = _preprocess_image(rgb_tar, image_shape)
     
-    mat = get_random_transform_matrix(rgb, **random_transform_args)
+    mat = get_random_transform_matrix(rgb_src, **random_transform_args)
     horizontal_flip = (np.random.uniform() <= random_transform_args['random_flip'])
-    rgb = random_transform(rgb, mat, horizontal_flip)
-    rgb2 = random_transform(rgb2, mat, horizontal_flip)
+    rgb_src = random_transform(rgb_src, mat, horizontal_flip)
+    rgb_src2 = random_transform(rgb_src2, mat, horizontal_flip)
     rgb_tar = random_transform(rgb_tar, mat, horizontal_flip)
-    segm = random_transform(
-        segm, 
+    segm_src = random_transform(
+        segm_src, 
         mat, 
         horizontal_flip, 
         border_mode=cv2.BORDER_CONSTANT, 
@@ -177,11 +177,11 @@ def get_data(identity, identity2, dict_fns_img, all_identities, path_trn_data, i
     
     # generate blurred rgb image (the generator's input image)
     if np.random.choice([True, False], p=[0.9, 0.1]):
-        rgb_blurred = get_blurred_rgb(rgb, segm, landmark_segm)
+        rgb_src_blurred = get_blurred_rgb(rgb_src, segm_src, landmark_segm)
     else:
-        rgb_blurred = get_masked_rgb(rgb, segm, landmark_segm)
+        rgb_src_blurred = get_masked_rgb(rgb_src, segm_src, landmark_segm)
     
-    return (rgb, segm, rgb_blurred, rgb2, rgb_tar, non_face_mask)
+    return (rgb_src, segm_src, rgb_src_blurred, rgb_src2, rgb_tar, non_face_mask)
 
 # ====================
 # Data generators
