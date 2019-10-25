@@ -83,14 +83,14 @@ def vis_parsing_maps(im, parsing_anno, stride=1):
     return vis_parsing_anno_color
 
 def detect_face(im, fd, with_landmarks=True):
-    def get_square_bbox(x0, x1, y0, y1, input_img):
+    def get_square_bbox(x0, y0, x1, y1, input_img):
         center = np.array([(x0 + x1)/2, (y0 + y1)/2])
         length = (x1-x0 + y1-y0) / 2
         if ((center - length//2) < 0).any():
             return x0, x1, y0, y1
         if ((center + length//2) > input_img.shape[:2]).any():
             return x0, x1, y0, y1
-        return center[0]-length/2, center[0]+length/2, center[1]-length/2, center[1]+length/2
+        return center[0]-length/2, center[1]-length/2, center[0]+length/2, center[1]+length/2
     landmarks = None
     if with_landmarks: 
         bboxes, landmarks = fd.detect_face(im, with_landmarks=with_landmarks)
@@ -229,7 +229,7 @@ def get_tar_inputs(fns, fd, fv, identity_extractor):
         im = cv2.imread(fn)[..., ::-1]
         im = auto_resize(im)
         (x0, y0, x1, y1), landmarks = detect_face(im, fd)
-        aligned_im = align_image(im, x0, y0, x1, y1, landmarks)    
+        aligned_im = align_image(im, x0, y0, x1, y1, landmarks) 
         (x0, y0, x1, y1), landmarks2 = detect_face(aligned_im, fd, with_landmarks=False)
         aligned_face = aligned_im[x0:x1, y0:y1, :].copy()
         if identity_extractor.lower() == "inceptionresnetv1":
