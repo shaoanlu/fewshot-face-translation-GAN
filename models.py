@@ -361,7 +361,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
 
         # Cyclic perceptual loss
         loss_cyc_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, rgb_cyclic_tensor2, w_pl)
-        self.loss_gen2 += loss_pl
+        self.loss_gen2 += loss_cyc_pl
 
         # Adversarial loss paired
         self.loss_gen2_paired, self.loss_dis_pair = adversarial_loss_paired(
