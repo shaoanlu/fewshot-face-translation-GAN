@@ -275,6 +275,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.rgb_gt_rand_tensor, 
             self.segm_tensor,
             self.emb_src_gt)
+        self.emb_cyclic_tensor2 = self.net_extractor(self.rgb_cyclic_tensor2)
 
     def define_losses(self):
         from networks.losses import adversarial_loss, reconstruction_loss, embeddings_hinge_loss
@@ -323,7 +324,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.loss_gen += self.loss_gen_emb
 
         # Perceptual loss
-        loss_pl = perceptual_loss(self.vggface_feats, x_gt, x_recon, w_pl)
+        loss_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, self.rgb_recon_tensor, w_pl)
         self.loss_gen += loss_pl
 
         # Laten embedding loss 2
@@ -345,9 +346,22 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.loss_gen2 += self.loss_gen_emb_relative
 
         # Cyclic loss
-        self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor - self.rgb_gt_tensor))
-        self.loss_cyc += w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor2 - self.rgb_gt_tensor))
+        #self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor - self.rgb_gt_tensor))
+        self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor2 - self.rgb_gt_tensor))
         self.loss_gen2 += self.loss_cyc
+
+        # Cyclic embedding loss        
+        self.loss_cyc_emb += w_cyc * embeddings_hinge_loss(
+            self.emb_cyclic_tensor2, 
+            self.emb_src_gt, 
+            w_adv,
+            m=0.25,
+            sep_emb=self.sep_emb)
+        self.loss_gen2 += self.loss_cyc_emb
+
+        # Cyclic perceptual loss
+        loss_cyc_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, rgb_cyclic_tensor2, w_pl)
+        self.loss_gen2 += loss_pl
 
         # Adversarial loss paired
         self.loss_gen2_paired, self.loss_dis_pair = adversarial_loss_paired(
