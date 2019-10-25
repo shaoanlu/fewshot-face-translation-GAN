@@ -20,16 +20,23 @@ class FaceTranslationGANBaseModel:
     def load_weights(self, dir_weights="weights"):     
         raise NotImplementedError()
 
-    def define_inference_path(self):
+    def define_inference_path(self, additional_emb=False):
         image_size = (self.input_size, self.input_size, self.nc_in)
         inp_src = Input(shape=image_size)
         inp_tar = Input(shape=image_size)
         inp_segm = Input(shape=image_size)
         try:
-            inp_emb = Input((self.latent_dim,))
-            self.path_inference = K.function(
-                [inp_src, inp_tar, inp_segm, inp_emb], 
-                [self.decoder(self.encoder([inp_src, inp_tar, inp_segm]) + [inp_emb])])
+            if additional_emb:
+                inp_emb1 = Input((self.latent_dim,))
+                inp_emb2 = Input((self.latent_dim,))
+                self.path_inference = K.function(
+                    [inp_src, inp_tar, inp_segm, inp_emb1, inp_emb2], 
+                    [self.decoder(self.encoder([inp_src, inp_tar, inp_segm]) + [inp_emb1, inp_emb2])])
+            else:
+                inp_emb = Input((self.latent_dim,))
+                self.path_inference = K.function(
+                    [inp_src, inp_tar, inp_segm, inp_emb], 
+                    [self.decoder(self.encoder([inp_src, inp_tar, inp_segm]) + [inp_emb])])
         except:
             raise Exception("Error building inference Keras function.")
         
@@ -39,7 +46,7 @@ class FaceTranslationGANBaseModel:
     def build_decoder(self):
         return gen.decoder(
             512, self.input_size//16, self.nc_in, 
-            self.num_fc, self.latent_dim, self.adain_sep_mean_var) 
+            self.num_fc, self.latent_dim, self.adain_sep_mean_var, self.additional_emb) 
 
     def build_discriminator_sem(self):
         """Build the discriminator 1 (semantic consistency).
@@ -66,10 +73,12 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
             self.latent_dim = int(config["latent_dim"])
             self.num_fc = 3
             self.adain_sep_mean_var = config["separate_adain"]
+            self.additional_emb = config["additional_emb"]
         elif self.identity_extractor == "ir50_hybrid":
             self.latent_dim = int(config["latent_dim"]) * 2
             self.num_fc = 5
             self.adain_sep_mean_var = config["separate_adain"]
+            self.additional_emb = config["additional_emb"]
         else:
             raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
         
@@ -81,7 +90,7 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
         self.dir_weights = config["dir_weights"]
         self.load_weights(self.dir_weights)   
 
-        self.define_inference_path()     
+        self.define_inference_path(additional_emb=self.additional_emb)     
         
     def load_weights(self, dir_weights):
         try:
@@ -97,12 +106,14 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
         return im / 255 * 2 - 1
     
     def inference(self, src, mask, tar, emb_tar):
+        if not isinstance(emb_tar, list):
+            emb_tar = [emb_tar]
         return self.path_inference(            
             [
                 self.preprocess_input(src)[None, ...], 
                 self.preprocess_input(tar)[None, ...], 
                 self.preprocess_input(mask.astype(np.uint8))[None, ...],
-                emb_tar
+                *emb_tar
             ])
 
 class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
@@ -172,10 +183,12 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.discriminator_pa.save_weights(str(PurePath(dir_weights, f"discriminator_pa_iter{str(iter)}.h5")))
 
     def forward_path(self, x_src, x_ref, x_segm, y_emb):
+        if not isinstance(y_emb, list):
+            y_emb = [y_emb]
         return self.decoder(
             self.encoder(
                 [x_src, x_ref, x_segm]
-            ) + [y_emb]
+            ) + y_emb
         )
 
     def define_variables(self):
