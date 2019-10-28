@@ -149,3 +149,55 @@ def resize_tensor(inp, shape):
         return Lambda(lambda x: tf.image.resize_images(x, [shape, shape]))(inp)
     elif isinstance(shape, list):
         return Lambda(lambda x: tf.image.resize_images(x, [shape[0], shape[1]]))(inp)
+
+# ========== Few-shot vid2vid ==========
+# Modified version of Modified SPADE form few-shot vid2vid paper
+# https://github.com/NVlabs/few-shot-vid2vid
+
+def weight_generation_module(input_tensor, k, nc_out, nc_in):
+    #x = AveragePooling2D()(input_tensor)
+    x = input_tensor
+    theta_s = Dense((k*k*nc_in*nc_in))(x)
+    theta_s = Reshape((k, k, nc_in, nc_in))(theta_s)
+    theta_gamma = Dense((nc_in*nc_out))(input_tensor)
+    theta_gamma = Reshape((1, 1, nc_in, nc_out))(theta_gamma)
+    theta_beta = Dense((nc_in*nc_out))(input_tensor)
+    theta_beta = Reshape((1, 1, nc_in, nc_out))(theta_beta)
+    return theta_s, theta_gamma, theta_beta
+
+def SPADE_wgm(input_tensor, gamma, beta):
+    def norm(x, epsilon=1e-5):
+        meanC, varC = tf.nn.moments(x, [1, 2], keep_dims=True)
+        sigmaC = tf.sqrt(tf.add(varC, epsilon))
+        return (x - meanC) / sigmaC
+    x = Lambda(lambda x: norm(x))(input_tensor)
+    p_h = add([x, multiply([x, gamma])])
+    p_h = add([p_h, beta])
+    return p_h
+
+def interm_img_syn_network(input_tensor, emb_tensor, cond_tensor, f, k=3):
+    reduce_ratio = 8
+    
+    # weight generation module
+    theta_s, theta_gamma, theta_beta = weight_generation_module(
+        emb_tensor, k, f, f//reduce_ratio)
+    
+    # modified SPADE generator
+    cond_tensor = Conv2D(f//reduce_ratio, kernel_size=1, kernel_initializer=conv_init)(cond_tensor)
+    p_s = ReflectPadding2D(cond_tensor)
+    p_s = Lambda(lambda x: K.conv2d(x[0], x[1][0, ...]))([p_s, theta_s])
+    p_s = LeakyReLU(alpha=0.2)(p_s)
+    gamma = Lambda(lambda x: K.conv2d(x[0], x[1][0, ...]))([p_s, theta_gamma])
+    beta = Lambda(lambda x: K.conv2d(x[0], x[1][0, ...]))([p_s, theta_beta])
+    
+    # SPADE resblk
+    x = input_tensor
+    x = SPADE_wgm(x, gamma, beta)
+    x = Activation('relu')(x)
+    x = Conv2D(f, kernel_size=3, kernel_initializer=conv_init, padding='same')(x)
+    x = SPADE_wgm(x, gamma, beta)
+    x = Activation('relu')(x)
+    x = Conv2D(f, kernel_size=3, kernel_initializer=conv_init, padding='same')(x)
+    x = add([x, input_tensor])
+    x = Activation('relu')(x)        
+    return x, p_s
