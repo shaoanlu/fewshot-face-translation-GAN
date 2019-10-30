@@ -43,10 +43,10 @@ class FaceTranslationGANBaseModel:
     def build_encoder(self):
         return gen.encoder(self.nc_in, self.input_size)
         
-    def build_decoder(self):
+    def build_decoder(self, use_nwg=False):
         return gen.decoder(
             512, self.input_size//16, self.nc_in, 
-            self.num_fc, self.latent_dim, self.adain_sep_mean_var, self.additional_emb) 
+            self.num_fc, self.latent_dim, self.adain_sep_mean_var, self.additional_emb, self.use_nwg) 
 
     def build_discriminator_sem(self):
         """Build the discriminator 1 (semantic consistency).
@@ -72,15 +72,14 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
         if self.identity_extractor == "inceptionresnetv1":
             self.latent_dim = int(config["latent_dim"])
             self.num_fc = 3
-            self.adain_sep_mean_var = config["separate_adain"]
-            self.additional_emb = config["additional_emb"]
         elif self.identity_extractor == "ir50_hybrid":
             self.latent_dim = int(config["latent_dim"]) * 2
             self.num_fc = 5
-            self.adain_sep_mean_var = config["separate_adain"]
-            self.additional_emb = config["additional_emb"]
         else:
             raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
+        self.adain_sep_mean_var = config["separate_adain"]
+        self.additional_emb = config["additional_emb"]
+        self.use_nwg = config["use_nwg"]
         
         try:
             self.encoder = self.build_encoder()
@@ -295,6 +294,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         # Adversarial loss
         self.loss_gen_adv, self.loss_dis = adversarial_loss(
             self.discriminator_sem,
+            self.rgb_inp_tensor,
             self.rgb_gt_tensor,
             self.rgb_recon_tensor,
             self.segm_tensor,
@@ -443,6 +443,10 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             raise Exception("Error loading pre-trained BiSeNet.")
         for layer in self.bisenet.layers:
             layer.trainable = False
+
+    def build_inceptionresnetv1(self):
+        from face_toolbox_keras.models.verifier.face_verifier import FaceVerifier
+        self.net_extractor = FaceVerifier(extractor="facenet", classes=512).net
 
     def build_hybrid_ir50s(self):
         def preprocess_ir50():

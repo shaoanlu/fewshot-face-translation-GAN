@@ -187,17 +187,17 @@ def get_src_inputs(fn, fd, fp, idet, identity_extractor):
     
     colored_parsing_map = parse_face(aligned_face, segm_mask, fp=fp)
     
-    #if identity_extractor.lower() == "inceptionresnetv1":
-    #    eyes_mask = get_eyes_mask(colored_parsing_map)
-    #    eyes_lms = detect_irises(aligned_im, idet, landmarks2)
-    #    eyes_lms = eyes_lms - np.array([[[x0, y0]]])
-    #    parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
-    #    return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
-    #elif identity_extractor.lower() == "ir50_hybrid":
-    #    return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
-    #else:
-    #    raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
-    return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
+    if identity_extractor.lower() == "inceptionresnetv1":
+        eyes_mask = get_eyes_mask(colored_parsing_map)
+        eyes_lms = detect_irises(aligned_im, idet, landmarks2)
+        eyes_lms = eyes_lms - np.array([[[x0, y0]]])
+        parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
+        return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
+    elif identity_extractor.lower() == "ir50_hybrid":
+        return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
+    else:
+        raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
+    #return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
   
 def get_tar_inputs(fns, fd, fv, identity_extractor):
     """

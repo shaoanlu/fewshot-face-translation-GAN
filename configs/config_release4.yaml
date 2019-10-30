@@ -17,7 +17,7 @@ loss:
   w_hc: 0.3                               # Hair consistency loss
   w_cyc: 0.5                              # Cyclic loss
   w_emb1: 0.1                             # Embeddings loss
-  w_emb2: 0.3                             # Relativistic distance loss
+  w_emb2: 0.1                             # Relativistic distance loss
   w_pl: 0.01                              # Perceptual loss
   w_sl: 0.02                              # Semantic consistency loss
 
@@ -27,7 +27,7 @@ input_size: 224                           # Image input size
 latent_dim: 512                           # Latent embedding dimension of identity extractor
 separate_adain: true                      # Use separate AdaIN params in residual blocks
 additional_emb: true                      # Use source face embeddings as additional conditioning input
-use_nwg: false                            # Use network weight generation module in decoder
+use_nwg: true                            # Use network weight generation module in decoder
 nc_in: 3                                  # Number of input channel
 
 # Dataset

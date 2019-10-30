@@ -41,7 +41,7 @@ FaceTranslationGANTrainModel loss functions
 
 dist_func = cosine_distance # hybrid_cos_euc_distance
 
-def adversarial_loss(net_dis, x_gt, x_recon, x_segm, x_emb, y_recon2, y_emb, w):
+def adversarial_loss(net_dis, x_blurred, x_gt, x_recon, x_segm, x_emb, y_recon2, y_emb, w):
     """Loss regarding discriminator 1 (adversarial loss and regression loss)
 
     Two types of loss are introduced:
@@ -60,13 +60,14 @@ def adversarial_loss(net_dis, x_gt, x_recon, x_segm, x_emb, y_recon2, y_emb, w):
     pred_dis_mixup, _ = net_dis([mixup, x_segm])
     pred_dis_real, pred_emb_real = net_dis([x_gt, x_segm])
     pred_dis_fake, pred_emb_fake = net_dis([x_recon, x_segm])
-    pred_dis_fake2, pred_emb_fake2 = net_dis([y_recon2, x_segm])
+    pred_dis_fake2, _ = net_dis([x_blurred, x_segm])
+    pred_dis_fake3, pred_emb_fake3 = net_dis([y_recon2, x_segm])
     loss_dis = least_square_loss(pred_dis_mixup, lam * K.ones_like(pred_dis_mixup))
-    #loss_dis += least_square_loss(pred_dis_fake2, K.zeros_like(pred_dis_fake2)) / 2
+    loss_dis += least_square_loss(pred_dis_fake2, K.zeros_like(pred_dis_fake2)) / 2
     loss_dis += least_square_loss(pred_emb_real, x_emb)
     loss_gen = w * least_square_loss(pred_dis_fake, K.ones_like(pred_dis_fake))
-    loss_gen += w * least_square_loss(pred_dis_fake2, K.ones_like(pred_dis_fake2))
-    loss_gen += w * least_square_loss(pred_emb_fake2, y_emb)
+    loss_gen += w * least_square_loss(pred_dis_fake3, K.ones_like(pred_dis_fake3))
+    loss_gen += w * least_square_loss(pred_emb_fake3, y_emb)
     #loss_gen += w * least_square_loss(pred_emb_fake, pred_emb_real)
     #loss_gen_adv += w * least_square_loss(pred_emb_fake, x_emb)
     return loss_gen, loss_dis
@@ -74,14 +75,14 @@ def adversarial_loss(net_dis, x_gt, x_recon, x_segm, x_emb, y_recon2, y_emb, w):
 def reconstruction_loss(x_gt, x_recon, y_recon, y_recon2, w):
     """L1 reconstruction loss
 
-    We add subtle L1 loss (the w/100 terms) on translated face,
+    We add weak L1 loss (the w/1000 terms) on translated face,
     Such regularization effectively eliminates artifacts on the output faces.
     """
     loss = w * K.mean(K.abs(x_recon - x_gt))
     #loss += w * ms_ssim_loss(x_recon, x_gt)
-    loss += w / 100 * K.mean(K.abs(y_recon - x_gt))
-    loss += w / 100 * K.mean(K.abs(y_recon2 - x_gt))
-    loss += w / 10 * K.mean(K.abs(y_recon2 - y_recon))
+    #loss += w / 1000 * K.mean(K.abs(y_recon - x_gt))
+    loss += w / 1000 * K.mean(K.abs(y_recon2 - x_gt))
+    #loss += w / 10 * K.mean(K.abs(y_recon2 - y_recon))
     return loss
 
 def embeddings_hinge_loss(emb, emb_gt, w, m=0.3, sep_emb=False):

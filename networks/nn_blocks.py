@@ -176,7 +176,11 @@ def SPADE_wgm(input_tensor, gamma, beta):
     return p_h
 
 def interm_img_syn_network(input_tensor, emb_tensor, cond_tensor, f, k=3):
-    reduce_ratio = 8
+    reduce_ratio = 1
+    if f >= 256:
+        reduce_ratio = 4
+    elif f >= 128:
+        reduce_ratio = 2
     
     # weight generation module
     theta_s, theta_gamma, theta_beta = weight_generation_module(

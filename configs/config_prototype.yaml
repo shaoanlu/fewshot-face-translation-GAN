@@ -5,7 +5,7 @@ dir_weights: ./weights                    # Path to weights folder
 
 # Optimization
 max_iter: 300000                          # Maximum number of training iterations
-batch_size: 2                             # Batch size
+batch_size: 4                             # Batch size
 lr_gen: 0.0001                            # Generator learning rate
 lr_dis: 0.0002                            # Discriminator learning rate
 
@@ -25,8 +25,8 @@ loss:
 identity_extractor: inceptionresnetv1     # Feature extraction network
 input_size: 224                           # Image input size
 latent_dim: 512                           # Latent embedding dimension of identity extractor
-separate_adain: true                      # Use separate AdaIN params in residual blocks
-additional_emb: true                      # Use source face embeddings as additional conditioning input
+separate_adain: false                      # Use separate AdaIN params in residual blocks
+additional_emb: false                      # Use source face embeddings as additional conditioning input
 use_nwg: false                            # Use network weight generation module in decoder
 nc_in: 3                                  # Number of input channel
 
