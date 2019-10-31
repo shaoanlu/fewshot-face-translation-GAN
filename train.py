@@ -92,8 +92,8 @@ class Trainer:
             out2[i*self.input_size:(i+1)*self.input_size, 1*self.input_size:2*self.input_size, :] = to_uint8(data_fixed[1][i, ...])
             out2[i*self.input_size:(i+1)*self.input_size, 2*self.input_size:3*self.input_size, :] = to_uint8(data_fixed[4][i, ...])
             out2[i*self.input_size:(i+1)*self.input_size, 3*self.input_size:4*self.input_size, :] = to_uint8(result2[0][i, ...])
-        cv2.imwrite(PurePath(save_path, "random_result_iter{str(iter)}.jpg"), out1)
-        cv2.imwrite(PurePath(save_path, "FIXED_result_iter{str(iter)}.jpg"), out2)
+        cv2.imwrite(str(PurePath(save_path, "random_result_iter{str(iter)}.jpg")), out1[..., ::-1])
+        cv2.imwrite(str(PurePath(save_path, "fixed_result_iter{str(iter)}.jpg")), out2[..., ::-1])
 
 if __name__ == "__main__":
     path_config = "configs/config.yaml"
