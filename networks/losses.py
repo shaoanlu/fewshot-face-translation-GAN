@@ -1,6 +1,7 @@
 from keras import backend as K
 from keras.layers import Lambda, dot
 import tensorflow as tf
+from tensorflow.contrib.distributions import Beta
 
 from networks.instance_normalization import InstanceNormalization
 
@@ -67,7 +68,7 @@ def adversarial_loss(net_dis, x_blurred, x_gt, x_recon, x_segm, x_emb, y_recon2,
     loss_dis += least_square_loss(pred_emb_real, x_emb)
     loss_gen = w * least_square_loss(pred_dis_fake, K.ones_like(pred_dis_fake))
     loss_gen += w * least_square_loss(pred_dis_fake3, K.ones_like(pred_dis_fake3))
-    loss_gen += w * least_square_loss(pred_emb_fake3, y_emb)
+    loss_gen += w * hinge_loss(dist_func(pred_emb_fake3, y_emb))
     #loss_gen += w * least_square_loss(pred_emb_fake, pred_emb_real)
     #loss_gen_adv += w * least_square_loss(pred_emb_fake, x_emb)
     return loss_gen, loss_dis
@@ -166,18 +167,18 @@ def semantic_consistency_loss(bisenet, x_gt, x_recon2, y_recon2, w):
         return x_normalized
     
     out_bisenet_fake = bisenet(Lambda(preproc_bisenet)(y_recon2))[0]
-    out_bisenet_fake_glasses = Lambda(lambda x: x[..., 6:7])(out_bisenet_fake)
-    out_bisenet_recon2 = bisenet(Lambda(preproc_bisenet)(x_recon2))[0]
-    out_bisenet_recon2_eyes = Lambda(lambda x: x[..., 4:7])(out_bisenet_recon2)
     out_bisenet_real = bisenet(Lambda(preproc_bisenet)(x_gt))[0]
-    out_bisenet_real_glasses = Lambda(lambda x: x[..., 6:7])(out_bisenet_real)
-    out_bisenet_real_eyes = Lambda(lambda x: x[..., 4:7])(out_bisenet_real)
     loss = w * K.mean(K.abs(out_bisenet_fake - out_bisenet_real))
-    loss += w * least_square_loss(
-        Lambda(lambda x: tf.image.resize_images(x, [32, 32]))(out_bisenet_fake_glasses),
-        Lambda(lambda x: tf.image.resize_images(x, [32, 32]))(out_bisenet_real_glasses)
-    )
-    loss += w * K.mean(K.abs(out_bisenet_recon2_eyes - out_bisenet_real_eyes))
+    #out_bisenet_fake_glasses = Lambda(lambda x: x[..., 6:7])(out_bisenet_fake)
+    #out_bisenet_recon2 = bisenet(Lambda(preproc_bisenet)(x_recon2))[0]
+    #out_bisenet_recon2_eyes = Lambda(lambda x: x[..., 4:7])(out_bisenet_recon2)
+    #out_bisenet_real_glasses = Lambda(lambda x: x[..., 6:7])(out_bisenet_real)
+    #out_bisenet_real_eyes = Lambda(lambda x: x[..., 4:7])(out_bisenet_real)
+    #loss += w * least_square_loss(
+    #    Lambda(lambda x: tf.image.resize_images(x, [32, 32]))(out_bisenet_fake_glasses),
+    #    Lambda(lambda x: tf.image.resize_images(x, [32, 32]))(out_bisenet_real_glasses)
+    #)
+    #loss += w * K.mean(K.abs(out_bisenet_recon2_eyes - out_bisenet_real_eyes))
     return loss
 
 def perceptual_loss(net_feat, x_gt, x_recon, w):
@@ -193,5 +194,5 @@ def perceptual_loss(net_feat, x_gt, x_recon, w):
         try:
             loss += w * K.mean(K.abs(InstanceNormalization()(f_recon) - InstanceNormalization()(f_gt)))
         except:
-            loss += w * K.mean(K.abs(InstanceNormalization()(f_recon) - InstanceNormalization()(f_gt)))
+            loss = w * K.mean(K.abs(InstanceNormalization()(f_recon) - InstanceNormalization()(f_gt)))
     return loss

@@ -20,13 +20,13 @@ class FaceTranslationGANBaseModel:
     def load_weights(self, dir_weights="weights"):     
         raise NotImplementedError()
 
-    def define_inference_path(self, additional_emb=False):
+    def define_inference_path(self):
         image_size = (self.input_size, self.input_size, self.nc_in)
         inp_src = Input(shape=image_size)
         inp_tar = Input(shape=image_size)
         inp_segm = Input(shape=image_size)
         try:
-            if additional_emb:
+            if self.additional_emb:
                 inp_emb1 = Input((self.latent_dim,))
                 inp_emb2 = Input((self.latent_dim,))
                 self.path_inference = K.function(
@@ -89,7 +89,7 @@ class FaceTranslationGANInferenceModel(FaceTranslationGANBaseModel):
         self.dir_weights = config["dir_weights"]
         self.load_weights(self.dir_weights)   
 
-        self.define_inference_path(additional_emb=self.additional_emb)     
+        self.define_inference_path()     
         
     def load_weights(self, dir_weights):
         try:
@@ -127,15 +127,16 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         if self.identity_extractor == "inceptionresnetv1":
             self.latent_dim = int(config["latent_dim"])
             self.num_fc = 3
-            self.adain_sep_mean_var = config["separate_adain"]
             self.sep_emb = False
         elif self.identity_extractor == "ir50_hybrid":
             self.latent_dim = int(config["latent_dim"]) * 2
             self.num_fc = 5
-            self.adain_sep_mean_var = config["separate_adain"]
             self.sep_emb = True
         else:
             raise ValueError(f"Received an unknown identity extractor: {identity_extractor}")
+        self.adain_sep_mean_var = config["separate_adain"]
+        self.additional_emb = config["additional_emb"]
+        self.use_nwg = config["use_nwg"]
         
         # Build generator
         print("Building generator...")
@@ -159,20 +160,35 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.discriminator_pa = self.build_discriminator_pa()
 
         print("Building loss functions...")
-        self.define_inference_path()
         self.define_variables()
         self.define_losses()
+        self.define_inference_path()
         print("Done")
 
     def load_weights(self, dir_weights):
         try:
             self.encoder.load_weights(str(PurePath(dir_weights, "encoder.h5")))
-            self.decoder.load_weights(str(PurePath(dir_weights, "decoder.h5")))
-            self.discriminator_sem.load_weights(str(PurePath(dir_weights, "discriminator_sem.h5")))
-            self.discriminator_pa.load_weights(str(PurePath(dir_weights, "discriminator_pa.h5")))
-            print(f"Found checkpoints in {dir_weights} folder. Built model with pre-trained weights.")
+            print("Load pre-trained encoder weights.")
         except:
-            print("No pre-trained weights were found. Model built with default initializaiton.")
+            print("Error occurs loading encoder weights.")
+            pass
+        try:
+            self.decoder.load_weights(str(PurePath(dir_weights, "decoder.h5")))
+            print("Load pre-trained decoder weights.")
+        except:
+            print("Error occurs loading decoder weights.")
+            pass
+        try:
+            self.discriminator_sem.load_weights(str(PurePath(dir_weights, "discriminator_sem.h5")))
+            print("Load pre-trained discriminator_sem weights.")
+        except:
+            print("Error loading discriminator_sem weights.")
+            pass
+        try:
+            self.discriminator_pa.load_weights(str(PurePath(dir_weights, "discriminator_pa.h5")))
+            print("Load pre-trained discriminator_pa weights.")
+        except:
+            print("Error loading discriminator_pa weights.")
             pass
 
     def save_weights(self, dir_weights, iter=""):
@@ -189,6 +205,16 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
                 [x_src, x_ref, x_segm]
             ) + y_emb
         )
+
+    def define_inference_path(self):
+        if self.additional_emb:
+            self.path_inference = K.function(
+                [self.rgb_gt_tensor, self.rgb_tar_tensor, self.segm_tensor], 
+                [self.decoder(self.encoder([self.rgb_gt_tensor, self.rgb_tar_tensor, self.segm_tensor]) + [self.emb_src_gt, self.emb_tar])])
+        else:
+            self.path_inference = K.function(
+                [self.rgb_gt_tensor, self.rgb_tar_tensor, self.segm_tensor], 
+                [self.decoder(self.encoder([self.rgb_gt_tensor, self.rgb_tar_tensor, self.segm_tensor]) + [self.emb_tar])])
 
     def define_variables(self):
         """Define network variables
@@ -219,8 +245,11 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         dist_emb = Beta(0.3, 0.3)
         if self.identity_extractor == "inceptionresnetv1":
             lam_emb = dist_emb.sample()
-            self.emb_src_mixed = lam_emb_asia * self.emb_src_gt + (1 - lam_emb) * self.emb_src_rand
+            self.emb_src_mixed = lam_emb * self.emb_src_gt + (1 - lam_emb) * self.emb_src_rand
             self.emb_src_mixed = K.l2_normalize(self.emb_src_mixed)
+            lam_emb2 = dist_emb.sample()
+            self.emb_src_mixed2 = lam_emb2 * self.emb_src_gt + (1 - lam_emb2) * self.emb_src_rand
+            self.emb_src_mixed2 = K.l2_normalize(self.emb_src_mixed2)
         elif self.identity_extractor == "ir50_hybrid":
             lam_emb_asia = dist_emb.sample()
             lam_emb_ms1m = dist_emb.sample()
@@ -233,50 +262,92 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.emb_src_mixed = Concatenate()([emb_src_mixed_asia, emb_src_mixed_ms1m])
 
         # x_blurred -> x_recon
-        self.rgb_recon_tensor = self.forward_path(
-            self.rgb_inp_tensor, 
-            self.rgb_gt_rand_tensor, 
-            self.segm_tensor,
-            self.emb_src_mixed) #
+        if not self.use_nwg:
+            self.rgb_recon_tensor = self.forward_path(
+                self.rgb_inp_tensor, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                self.emb_src_mixed) #
+        else:
+            self.rgb_recon_tensor = self.forward_path(
+                self.rgb_inp_tensor, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                [self.emb_src_mixed, self.emb_src_mixed2]) #
         self.emb_recon_tensor = self.net_extractor(self.rgb_recon_tensor)
 
         # x_gt -> x_recon
-        self.rgb_recon_tensor2 = self.forward_path(
-            self.rgb_gt_tensor, #
-            self.rgb_gt_rand_tensor, 
-            self.segm_tensor,
-            self.emb_src_mixed) #
+        if not self.use_nwg:
+            self.rgb_recon_tensor2 = self.forward_path(
+                self.rgb_gt_tensor, #
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                self.emb_src_mixed) #
+        else:
+            self.rgb_recon_tensor2 = self.forward_path(
+                self.rgb_gt_tensor, #
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                [self.emb_src_mixed, self.emb_src_mixed2]) #
 
         # x_blurred -> y_recon
-        self.rgb_recon_tar_tensor = self.forward_path(
-            self.rgb_inp_tensor, #
-            self.rgb_tar_tensor, 
-            self.segm_tensor,
-            self.emb_tar)
+        if not self.use_nwg:
+            self.rgb_recon_tar_tensor = self.forward_path(
+                self.rgb_inp_tensor, #
+                self.rgb_tar_tensor, 
+                self.segm_tensor,
+                self.emb_tar)
+        else:
+            self.rgb_recon_tar_tensor = self.forward_path(
+                self.rgb_inp_tensor, #
+                self.rgb_tar_tensor, 
+                self.segm_tensor,
+                [self.emb_src_mixed, self.emb_tar])
 
         # x_gt -> y_recon
-        self.rgb_recon_tar_tensor2 = self.forward_path(
-            self.rgb_gt_tensor, #
-            self.rgb_tar_tensor, 
-            self.segm_tensor,
-            self.emb_tar)
+        if not self.use_nwg:
+            self.rgb_recon_tar_tensor2 = self.forward_path(
+                self.rgb_gt_tensor, #
+                self.rgb_tar_tensor, 
+                self.segm_tensor,
+                self.emb_tar)
+        else:
+            self.rgb_recon_tar_tensor2 = self.forward_path(
+                self.rgb_gt_tensor, #
+                self.rgb_tar_tensor, 
+                self.segm_tensor,
+                [self.emb_src_mixed, self.emb_tar])
 
         # x_blurred -> y_recon -> x_recon_recon
         self.emb_recon_tar_tensor = self.net_extractor(self.rgb_recon_tar_tensor)
         self.emb_recon_tar_tensor2 = self.net_extractor(self.rgb_recon_tar_tensor2)
-        self.rgb_cyclic_tensor =  self.forward_path(
-            self.rgb_recon_tar_tensor, 
-            self.rgb_gt_rand_tensor, 
-            self.segm_tensor,
-            self.emb_src_gt)
-        self.rgb_cyclic_tensor2 =  self.forward_path(
-            self.rgb_recon_tar_tensor2, 
-            self.rgb_gt_rand_tensor, 
-            self.segm_tensor,
-            self.emb_src_gt)
+        if not self.use_nwg:
+            self.rgb_cyclic_tensor =  self.forward_path(
+                self.rgb_recon_tar_tensor, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                self.emb_src_gt)
+            self.rgb_cyclic_tensor2 =  self.forward_path(
+                self.rgb_recon_tar_tensor2, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                self.emb_src_gt)
+        else:
+            self.rgb_cyclic_tensor =  self.forward_path(
+                self.rgb_recon_tar_tensor, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                [self.emb_recon_tar_tensor, self.emb_src_gt])
+            self.rgb_cyclic_tensor2 =  self.forward_path(
+                self.rgb_recon_tar_tensor2, 
+                self.rgb_gt_rand_tensor, 
+                self.segm_tensor,
+                [self.emb_recon_tar_tensor2, self.emb_src_gt])
         self.emb_cyclic_tensor2 = self.net_extractor(self.rgb_cyclic_tensor2)
 
     def define_losses(self):
+        def print_process(count, num_losses=9):
+            print(f"    Defining losses ({str(count)} / {str(num_losses)})")
         from networks.losses import adversarial_loss, reconstruction_loss, embeddings_hinge_loss
         from networks.losses import relative_embeddings_loss, semantic_consistency_loss, adversarial_loss_paired
         from networks.losses import perceptual_loss
@@ -290,6 +361,7 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         w_emb2 = self.config["loss"]["w_emb2"]
         w_pl = self.config["loss"]["w_pl"]
         w_sl = self.config["loss"]["w_sl"]
+        count = 0
 
         # Adversarial loss
         self.loss_gen_adv, self.loss_dis = adversarial_loss(
@@ -304,6 +376,8 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             w_adv
         )
         self.loss_gen = self.loss_gen_adv 
+        count += 1
+        print_process(count)
 
         # Reconstruction regularization
         self.loss_gen_rec = reconstruction_loss(
@@ -314,6 +388,8 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             w_recon
             )
         self.loss_gen += self.loss_gen_rec
+        count += 1
+        print_process(count)
 
         # Latent embedding loss
         self.loss_gen_emb = embeddings_hinge_loss(
@@ -322,10 +398,14 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             w_adv,
             sep_emb=self.sep_emb)
         self.loss_gen += self.loss_gen_emb
+        count += 1
+        print_process(count)
 
         # Perceptual loss
         loss_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, self.rgb_recon_tensor, w_pl)
         self.loss_gen += loss_pl
+        count += 1
+        print_process(count)
 
         # Laten embedding loss 2
         # recon_tar should be close to tar face and far from src face
@@ -344,24 +424,28 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             sep_emb=self.sep_emb)
         self.loss_gen2 = self.loss_gen_emb2
         self.loss_gen2 += self.loss_gen_emb_relative
+        count += 1
+        print_process(count)
 
         # Cyclic loss
         #self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor - self.rgb_gt_tensor))
         self.loss_cyc = w_cyc * K.mean(K.abs(self.rgb_cyclic_tensor2 - self.rgb_gt_tensor))
         self.loss_gen2 += self.loss_cyc
+        count += 1
+        print_process(count)
 
         # Cyclic embedding loss        
-        self.loss_cyc_emb += w_cyc * embeddings_hinge_loss(
-            self.emb_cyclic_tensor2, 
-            self.emb_src_gt, 
-            w_adv,
-            m=0.25,
-            sep_emb=self.sep_emb)
-        self.loss_gen2 += self.loss_cyc_emb
+        #self.loss_cyc_emb = w_cyc * embeddings_hinge_loss(
+        #    self.emb_cyclic_tensor2, 
+        #    self.emb_src_gt, 
+        #    w_adv,
+        #    m=0.25,
+        #    sep_emb=self.sep_emb)
+        #self.loss_gen2 += self.loss_cyc_emb
 
         # Cyclic perceptual loss
-        loss_cyc_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, rgb_cyclic_tensor2, w_pl)
-        self.loss_gen2 += loss_cyc_pl
+        #loss_cyc_pl = perceptual_loss(self.vggface_feats, self.rgb_gt_tensor, self.rgb_cyclic_tensor2, w_pl)
+        #self.loss_gen2 += loss_cyc_pl
 
         # Adversarial loss paired
         self.loss_gen2_paired, self.loss_dis_pair = adversarial_loss_paired(
@@ -374,6 +458,8 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             w_adv2
         )
         self.loss_gen2 += self.loss_gen2_paired
+        count += 1
+        print_process(count)
 
         # hair consistency loss
         # L1 loss on masked hair region, require additional hair parsing map
@@ -381,6 +467,8 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
         self.loss_hair_consistency = w_hc * K.mean(self.hair_mask_tensor * K.abs(self.rgb_recon_tar_tensor2 - self.rgb_gt_tensor))
         self.loss_hair_consistency += w_hc * K.mean(self.hair_mask_tensor * K.abs(self.rgb_recon_tensor - self.rgb_gt_tensor))
         self.loss_gen2 += self.loss_hair_consistency
+        count += 1
+        print_process(count)
 
         # semantic consistency loss
         # By using BiSeNet as an auxiliary network,
@@ -393,10 +481,12 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.rgb_recon_tar_tensor2, 
             w_sl)
         self.loss_gen2 += self.loss_gen_sl
+        count += 1
+        print_process(count)
 
     def build_embeddings_extractor(self):
         if self.identity_extractor == "inceptionresnetv1":
-            raise NotImplementedError() 
+            self.build_inceptionresnetv1()
         elif self.identity_extractor == "ir50_hybrid":
             self.build_hybrid_ir50s()
 
@@ -566,7 +656,6 @@ class FaceTranslationGANTrainModel(FaceTranslationGANBaseModel):
             self.loss_gen_emb, 
             self.loss_gen_emb2, 
             self.loss_gen_emb_relative, 
-            self.loss_gen_adv2, 
             self.loss_cyc, 
             self.loss_gen_sl]
         return update_inp, update_out
