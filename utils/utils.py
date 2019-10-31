@@ -50,6 +50,16 @@ def landmarks_match(src_im, src_landmarks, tar_landmarks, border_mode=cv2.BORDER
 def get_68_landmarks_edge_image(img, face, lms, eyes_binary_mask=False, apply_dilate_or_erode=True):
     result = np.zeros_like(img, np.uint8)
     stroke_size = np.maximum(np.min(face.shape[:2])//50, 2)    
+
+    # chin and eyebrows
+    result = cv2.fillPoly(
+        result.copy(), 
+        [np.array([(int(lms[i][1]), int(lms[i][0])) for i in range(0,17)]).reshape(-1,1,2)],
+        (0,0,255))
+    result = cv2.fillPoly(
+        result.copy(), 
+        [np.array([(int(lms[i][1]), int(lms[i][0])) for i in [0,]+list(range(17,27))+[16,]]).reshape(-1,1,2)],
+        (0,0,255))
         
     # nose
     for i in range(27,30):

@@ -37,7 +37,7 @@ def get_random_identity(exclude_identity=None, all_identities=[]):
     return rand_id
 
 def get_parsing_mask(identity, raw_fn, path_trn_data, return_non_face_region=False):
-    fn_segm = path_trn_data / identity / "parsing_maps" / f"{raw_fn}.png"
+    fn_segm = PurePath(path_trn_data, identity, "parsing_maps", f"{raw_fn}.png")
     fn_segm = str(fn_segm)
     segm = _load_image(fn_segm)   
     if return_non_face_region:
@@ -45,15 +45,18 @@ def get_parsing_mask(identity, raw_fn, path_trn_data, return_non_face_region=Fal
         hat_mask = np.prod(segm==(255,0,255), axis=-1, keepdims=True)
         earing_mask = np.prod(segm==(170,255,0), axis=-1, keepdims=True)
         background_mask = np.prod(segm==(0,0,0), axis=-1, keepdims=True)
+        #eyes_mask = np.prod(segm==(255,255,255), axis=-1, keepdims=True)
         non_face_region_mask = np.bitwise_or(np.bitwise_or(np.bitwise_or(hair_mask, hat_mask), earing_mask), background_mask)
         non_face_region_mask = non_face_region_mask.astype(np.float32) * 255 # [0, 255]
         non_face_region_mask = np.repeat(non_face_region_mask, 3, axis=-1)
+        #eyes_mask = eyes_mask.astype(np.float32) * 255
+        #eyes_mask = np.repeat(eyes_mask, 3, axis=-1)
         return segm, non_face_region_mask
     else:
         return segm
 
 def get_segmentation_mask(identity, raw_fn, path_trn_data):
-    fn_segm = path_trn_data / identity / "seg_mask" / f"{raw_fn}.png"
+    fn_segm = PurePath(path_trn_data, identity, "seg_mask", f"{raw_fn}.png")
     fn_segm = str(fn_segm)
     segm = _load_image(fn_segm)
     return segm
@@ -66,7 +69,7 @@ def get_blurred_rgb(rgb, segm, landmark_segm):
     face_mask = cv2.GaussianBlur(face_mask.astype(np.uint8), (kernel_size, kernel_size), 0)
     face_mask = face_mask.astype(np.float32) / 255
     face_mask = face_mask[..., np.newaxis]
-    ratio = np.random.randint(8,64) / face_mask.shape[0]
+    ratio = np.random.randint(4,16) / face_mask.shape[0]
     interp1, interp2 = np.random.choice([cv2.INTER_CUBIC, cv2.INTER_LINEAR], 2)
     blurred_rgb = cv2.resize(rgb.copy(), (0,0), fx=ratio, fy=ratio, interpolation=interp1)
     blurred_rgb = cv2.resize(blurred_rgb, (0,0), fx=1/ratio, fy=1/ratio, interpolation=interp2)    
@@ -131,6 +134,8 @@ def get_data(identity, identity2, dict_fns_img, all_identities, path_trn_data, i
         rand_fn_src2 = dict_fns_img.get_random_filename(identity)
         rand_fn_tar = dict_fns_img.get_random_filename(identity2)
     raw_fn_src = PurePath(rand_fn_src).stem
+
+    # Load images
     rgb_src = _load_image(rand_fn_src)
     rgb_src2 = _load_image(rand_fn_src2)
     rgb_tar = _load_image(rand_fn_tar)
@@ -145,12 +150,16 @@ def get_data(identity, identity2, dict_fns_img, all_identities, path_trn_data, i
     landmark_segm = get_segmentation_mask(identity, raw_fn_src, path_trn_data)
     landmark_segm = _preprocess_image(landmark_segm, image_shape)
     
+    # Augmentation 1
     if np.random.uniform() <= 0.25:
         rgb_src = random_color_match(rgb_src, rgb_tar) # ressize to (256,256)
+
+    # Scale uint8 to [-1., +1.]
     rgb_src = _preprocess_image(rgb_src, image_shape)
     rgb_src2 = _preprocess_image(rgb_src2, image_shape)
     rgb_tar = _preprocess_image(rgb_tar, image_shape)
     
+    # Augmentation 2
     mat = get_random_transform_matrix(rgb_src, **random_transform_args)
     horizontal_flip = (np.random.uniform() <= random_transform_args['random_flip'])
     rgb_src = random_transform(rgb_src, mat, horizontal_flip)
@@ -186,6 +195,14 @@ def get_data(identity, identity2, dict_fns_img, all_identities, path_trn_data, i
 # ====================
 
 class RandomFilenameGenerator():
+    """Filename generator
+
+    The straightforward way to get random filenames is to call
+    np.random.choice(...) on a list that contains all image filenames.
+    However, it becomes a bottleneck when the list contains hundreds of thousands of fns.
+    This class is to solve this problem by not shuffling the list everytime it get sampled
+    and keep fns of each identity separate.
+    """
     def __init__(self, dict_fns):
         self.dict_fns_orig = {}
         self.dict_fns_gen = {}
@@ -204,26 +221,29 @@ class RandomFilenameGenerator():
     def init_dict_item(self, identity):
         self.dict_fns_gen[identity] = self.dict_fns_orig[identity].copy()
         random.shuffle(self.dict_fns_gen[identity])
-        
-    def get_length(self, identity):
-        return len(self.dict_fns_orig[identity])
     
 @background(12)
 def minibatch(config):
+    # Read configs
     dir_trn_data = PurePath(config["dir_data"])
     batch_size = config["batch_size"]
     image_shape = (config["input_size"], config["input_size"], 3)
+
+    # Traverse identity folders
     all_identities = glob(str(PurePath(dir_trn_data, "*")))
     all_identities = [Path(dirs).stem for dirs in all_identities]
     dict_fns_img = {}
 
+    # Load images
     print(f"Found {str(len(all_identities))} identities in folder {str(dir_trn_data)}.")
     print("Loading images...")
     for identity in tqdm(all_identities):
         dict_fns_img[identity] = glob(str(PurePath(dir_trn_data, identity, "rgb", "*.jpg")))
     print("Finished.")
-        
+
+    # Instantiate RandomFilenameGenerator
     rand_fn_generator = RandomFilenameGenerator(dict_fns_img)
+
     while True:
         rgb_gt_src = np.zeros((batch_size, ) + image_shape)
         rgb_rand_src = np.zeros((batch_size, ) + image_shape)
