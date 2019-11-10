@@ -114,7 +114,7 @@ if __name__ == "__main__":
         if (iteration + 1) % save_iter == 0:
             data_infer = next(dataset)
             trainer.show_current_loss(iteration)
-            trainer.save_preview_image(data_infer, anchor_batch, anchor_batch, iteration)
+            trainer.save_preview_image(data_infer, anchor_batch, iteration)
             trainer.save_weights()
             trainer.clear_loss()
 
