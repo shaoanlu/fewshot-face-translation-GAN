@@ -111,6 +111,47 @@ def detect_face(im, fd, with_landmarks=True):
     x0, y0, x1, y1 = bboxes[0][:-1].astype(np.int32)
     x0, y0, x1, y1 = map(np.int32, get_square_bbox(x0, y0, x1, y1, im))
     return (x0, y0, x1, y1), landmarks
+
+def detect_face_prl(im_prl, fd, with_landmarks=True):
+    '''
+    get bounding boxes and landmarks (modified from the function "detect_face" in util.py)
+    Parameters
+    ----------
+    image_prl : list of cv2 images
+        list of input images. 
+        preferred length: 32, dimention 500*500*3, BGR image
+    with_landmarks : boolean, optional
+        For now it's always True.
+    Returns
+    -------
+    list of tuple(bounding box, landmark)-the most confident face 
+             OR None-no face is detected.
+    '''
+    
+    def get_square_bbox(x0, x1, y0, y1, input_img):
+           center = np.array([(x0 + x1)/2, (y0 + y1)/2])
+           length = (x1-x0 + y1-y0) / 2
+           if ((center - length//2) < 0).any():
+               return x0, x1, y0, y1
+           if ((center + length//2) > input_img.shape[:2]).any():
+               return x0, x1, y0, y1
+           return center[0]-length/2, center[0]+length/2, center[1]-length/2, center[1]+length/2
+    
+        
+    # detect bounding boxes and landmarks from face_detector
+    res = fd.detect_face_prl(im_prl)
+    
+    # post-processing for the detection, same as original    
+    ret = []
+    for i in range(len(res)):
+        if res[i] is None:
+            ret.append(None)
+        else:
+            bbox, landmark = res[i]
+            x0, y0, x1, y1 = bbox[:-1].astype(np.int32)
+            x0, y0, x1, y1 = map(np.int32, get_square_bbox(x0, y0, x1, y1, im_prl[i]))
+            ret.append(((x0, y0, x1, y1), landmark))      
+    return ret
   
 def align_image(im, x0, y0, x1, y1, landmarks):
     lms_tar = get_tar_landmarks(im[x0:x1, y0:y1, :], 68)
@@ -192,6 +233,69 @@ def get_src_inputs(fn, fd, fp, idet):
     eyes_lms = eyes_lms - np.array([[[x0, y0]]])
     parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
     return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
+
+def get_src_inputs_prl(image_prl, fd, fp, idet):    
+    '''
+    get bounding boxes and landmarks (modified from the function "get_src_inputs_prl" in util.py)
+    Parameters
+    ----------
+    image_prl : list of cv2 images
+        list of input images. 
+        preferred length: 32, dimention 500*500*3, BGR image
+    fd : face detector
+    fp : face parser
+    idet: iris detector        
+    Returns
+    -------
+    list of tuple(5,)-the most confident face 
+        aligned_face
+        parsing_map_with_iris
+        aligned_im,
+        (x0, y0, x1, y1),
+        landmarks
+    OR None-no face is detected.
+    '''
+    
+    # face detect phase 1
+    res = detect_face_prl(image_prl, fd)
+    
+    # get aligned image
+    aligned_im_prl = []
+    for i in range(len(image_prl)):
+        if res[i] is None:
+            aligned_im_prl.append(image_prl[i])
+        else:
+            im = image_prl[i]
+            x0, y0, x1, y1 = res[i][0]
+            landmarks = res[i][1]
+            aligned_im = align_image(im, x0, y0, x1, y1, [landmarks])
+            aligned_im_prl.append(aligned_im)
+    
+    # detect again for better results
+    res_aligned = detect_face_prl(aligned_im_prl, fd)
+    # Apply detection & alignment twice for better face alignment result.
+    
+    # below is same as original
+    ret = []
+    for i in range(len(image_prl)):
+        if res_aligned[i] is None:
+            ret.append(None)
+        else:
+            aligned_im = aligned_im_prl[i]
+            x0, y0, x1, y1 = res_aligned[i][0]
+            landmarks2 = res_aligned[i][1]
+            landmarks = res[i][1]
+            aligned_face = aligned_im[x0:x1, y0:y1, :].copy()
+            segm_mask = get_segm_mask(aligned_im, aligned_face, x0, y0, x1, y1, [landmarks2])
+    
+        colored_parsing_map = parse_face(aligned_face, segm_mask, fp=fp)
+        eyes_mask = get_eyes_mask(colored_parsing_map)
+        
+        eyes_lms = detect_irises(aligned_im, idet, [landmarks2])
+        eyes_lms = eyes_lms - np.array([[[x0, y0]]])
+        parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)        
+        ret.append((aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks))
+    return ret
   
 def get_tar_inputs(fns, fd, fv):
     """
