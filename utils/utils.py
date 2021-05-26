@@ -137,24 +137,6 @@ def parse_face(im, seg_mask, fp):
     colored_parsing_map = (1-nose_tip_mask) * colored_parsing_map + nose_tip_mask * seg_mask
     return colored_parsing_map
   
-def get_eyes_mask(colored_parsing_map):
-    return np.prod(colored_parsing_map == (255,255,255), axis=-1)[...,None]
-  
-def detect_irises(im, idet, landmarks2=None):
-    eye_lms = idet.detect_iris(im, landmarks2)
-    return eye_lms
-  
-def draw_irises(colored_parsing_map, eyes_mask, eyes_lms):
-    parsing_map_with_iris = colored_parsing_map.copy()
-    for lms in eyes_lms[0]:
-        parsing_map_with_iris = cv2.fillPoly(
-            parsing_map_with_iris.astype(np.int32), 
-            [lms[8:16, ::-1].reshape(-1,1,2).astype(np.int32)], 
-            color=(125,125,125)) 
-    parsing_map_with_iris = (1 - eyes_mask) * colored_parsing_map\
-    + eyes_mask * parsing_map_with_iris
-    return parsing_map_with_iris
-
 def auto_resize(im, max_size=768):
     if np.max(im.shape) > max_size:
         ratio = max_size / np.max(im.shape)
@@ -186,12 +168,8 @@ def get_src_inputs(fn, fd, fp, idet):
     segm_mask = get_segm_mask(aligned_im, aligned_face, x0, y0, x1, y1, landmarks2)
     
     colored_parsing_map = parse_face(aligned_face, segm_mask, fp=fp)
-    eyes_mask = get_eyes_mask(colored_parsing_map)
-    
-    eyes_lms = detect_irises(aligned_im, idet, landmarks2)
-    eyes_lms = eyes_lms - np.array([[[x0, y0]]])
-    parsing_map_with_iris = draw_irises(colored_parsing_map, eyes_mask, eyes_lms)
-    return aligned_face, parsing_map_with_iris, aligned_im, (x0, y0, x1, y1), landmarks
+
+    return aligned_face, colored_parsing_map, aligned_im, (x0, y0, x1, y1), landmarks
   
 def get_tar_inputs(fns, fd, fv):
     """
