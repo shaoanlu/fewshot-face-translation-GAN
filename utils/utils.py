@@ -27,7 +27,7 @@ def get_tar_landmarks(img, landmarks_type=68):
              [0.81675393, 0.52105263], [0.81675393, 0.46315789], [0.81675393, 0.38421053]]
         )
     else:
-        raise NotImplementedError(f"Only 68 points landmarks model is provided. Received {landmarks_pnts}.")
+        raise NotImplementedError(f"Only 68 points landmarks model is provided. Received {landmarks_type}.")
     tar_landmarks = [(int(xy[0]*img_sz[0]), int(xy[1]*img_sz[1])) for xy in avg_landmarks]
     return tar_landmarks
 
@@ -47,7 +47,7 @@ def landmarks_match(src_im, src_landmarks, tar_landmarks, border_mode=cv2.BORDER
     result = cv2.warpAffine(src_im, M, (src_size[1], src_size[0]), borderMode=border_mode, borderValue=border_value)
     return result, M     
         
-def get_68_landmarks_edge_image(img, face, lms, eyes_binary_mask=False, apply_dilate_or_erode=True):
+def get_68_landmarks_edge_image(img, face, lms):
     result = np.zeros_like(img, np.uint8)
     stroke_size = np.maximum(np.min(face.shape[:2])//50, 2)    
         
@@ -125,8 +125,7 @@ def get_segm_mask(im, face_im, x0, y0, x1, y1, landmarks):
     seg_mask = get_68_landmarks_edge_image(
         im, 
         face_im, 
-        landmarks[0],
-        apply_dilate_or_erode=False)
+        landmarks[0])
     seg_mask = seg_mask[int(x0):int(x1), int(y0):int(y1), :] 
     return seg_mask
   
@@ -203,8 +202,8 @@ def get_tar_inputs(fns, fd, fv):
         aligned_face: A RGB image.
         emb_tar: A numpy array of shape (512,). Latent embeddings of aligned_face.
     """
-    if not type(fns) == list:
-        if type(fns) == str:
+    if not isinstance(fns, list):
+        if isinstance(fns, str):
             fns = [fns]
         else:
             raise ValueError("Received and unknown filename type. fns shoulbe be a list or a string.")
