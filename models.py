@@ -1,8 +1,8 @@
 import cv2
 import os
 import numpy as np
-from keras.layers import Input
-from keras import backend as K
+from tensorflow.keras.layers import Input
+from tensorflow.keras import backend as K
 
 import networks.generator as gen
 
@@ -57,4 +57,3 @@ class FaceTranslationGANInferenceModel:
                 self.preprocess_input(mask.astype(np.uint8))[None, ...],
                 emb_tar
             ])
-        
